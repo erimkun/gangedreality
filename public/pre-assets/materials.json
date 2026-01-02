@@ -1,0 +1,133 @@
+{
+  "materials": [
+    {
+      "id": "custom-wood-1",
+      "name": "Özel Ahşap",
+      "category": "wood",
+      "color": "#8B4513",
+      "metalness": 0,
+      "roughness": 0.6,
+      "textureUrl": "/pre-assets/textures/wood-diffuse.jpg",
+      "normalMapUrl": "/pre-assets/textures/wood-normal.jpg"
+    },
+    {
+      "id": "scanned-101-concrete-bare-clean-texture-seamless",
+      "name": "101 Concrete Bare Clean Texture Seamless",
+      "category": "stone",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/101_concrete bare clean texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/101_concrete bare clean texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-116-dark-parquet-flooring-texture-seamless",
+      "name": "116 Dark Parquet Flooring Texture Seamless",
+      "category": "other",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/116_dark parquet flooring texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/116_dark parquet flooring texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-134-beech-fine-wood-pbr-texture-seamless",
+      "name": "134 Beech Fine Wood Pbr Texture Seamless",
+      "category": "wood",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/134_Beech fine wood PBR texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/134_Beech fine wood PBR texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-140-concrete-bare-clean-texture-seamless",
+      "name": "140 Concrete Bare Clean Texture Seamless",
+      "category": "stone",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/140_concrete bare clean texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/140_concrete bare clean texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-153-concrete-bare-clean-texture-seamless",
+      "name": "153 Concrete Bare Clean Texture Seamless",
+      "category": "stone",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/153_concrete bare clean texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/153_concrete bare clean texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-160-parquet-medium-color-texture-seamless",
+      "name": "160 Parquet Medium Color Texture Seamless",
+      "category": "other",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/160_parquet medium color texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/160_parquet medium color texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-199-clay-plaster-pbr-texture-seamless",
+      "name": "199 Clay Plaster Pbr Texture Seamless",
+      "category": "other",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/199_clay plaster pbr texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/199_clay plaster pbr texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-200-clay-plaster-pbr-texture-seamless",
+      "name": "200 Clay Plaster Pbr Texture Seamless",
+      "category": "other",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/200_clay plaster pbr texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/200_clay plaster pbr texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-37-light-wood-fine-texture-seamless",
+      "name": "37 Light Wood Fine Texture Seamless",
+      "category": "wood",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/37_light wood fine texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/37_light wood fine texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-50-clean-plaster-texture-seamless",
+      "name": "50 Clean Plaster Texture Seamless",
+      "category": "other",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/50_clean plaster texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/50_clean plaster texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-51-white-wood-fine-texture-seamless",
+      "name": "51 White Wood Fine Texture Seamless",
+      "category": "wood",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/51_white wood fine texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/51_white wood fine texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-89-norwegian-style-stone-tiles-pbr-texture-seamless",
+      "name": "89 Norwegian Style Stone Tiles Pbr Texture Seamless",
+      "category": "stone",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/89_Norwegian style stone tiles pbr texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/89_Norwegian style stone tiles pbr texture-seamless.jpg"
+    },
+    {
+      "id": "scanned-91-concrete-bare-clean-texture-seamless",
+      "name": "91 Concrete Bare Clean Texture Seamless",
+      "category": "stone",
+      "metalness": 0,
+      "roughness": 0.5,
+      "textureUrl": "/pre-assets/textures/91_concrete bare clean texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/91_concrete bare clean texture-seamless.jpg"
+    }
+  ],
+  "_info": "Bu dosya scan-textures.js scripti tarafından güncellenmiştir. Özel materyaller ekleyebilirsiniz.",
+  "_lastScanned": "2025-12-30T10:47:38.530Z"
+}

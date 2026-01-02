@@ -1,0 +1,12 @@
+{
+  "projectId": "1108-1",
+  "projectName": "Acıbadem Mahallesi 1108 Ada 1 Parsel",
+  "version": "1.0",
+  "defaultMode": "viewer",
+  "editorLock": false,
+  "assets": {
+    "mainModel": "/data/1108-1/model/uk_01_deneme.glb",
+    "envMap": null,
+    "models": []
+  }
+}

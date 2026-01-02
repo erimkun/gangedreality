@@ -1,0 +1,80 @@
+{
+  "configurableGroups": [
+    {
+      "id": "group_ggee23xtg",
+      "displayName": "122____011_1 Grubu",
+      "icon": null,
+      "targetMeshNames": [
+        "122____011_1"
+      ],
+      "options": [
+        {
+          "name": "Kırmızı",
+          "type": "color",
+          "value": "#ff0000"
+        },
+        {
+          "name": "Bordo",
+          "type": "color",
+          "value": "#7e0202"
+        },
+        {
+          "name": "Krem",
+          "type": "color",
+          "value": "#e4b68b"
+        },
+        {
+          "name": "37 Light Wood Fine Texture Seamless",
+          "type": "texture",
+          "textureUrl": "/pre-assets/textures/37_light wood fine texture-seamless.jpg",
+          "tiling": [
+            1,
+            1
+          ]
+        }
+      ],
+      "defaultOptionIndex": 0,
+      "selectedOptionIndex": null
+    },
+    {
+      "id": "group_ku3kfxvi6",
+      "displayName": "153____011 Grubu",
+      "icon": null,
+      "targetMeshNames": [
+        "153____011"
+      ],
+      "options": [
+        {
+          "name": "Mavi",
+          "type": "color",
+          "value": "#1100ff"
+        },
+        {
+          "name": "Siyah",
+          "type": "color",
+          "value": "#000000"
+        },
+        {
+          "name": "Pembe",
+          "type": "color",
+          "value": "#fb00ff"
+        }
+      ],
+      "defaultOptionIndex": 0,
+      "selectedOptionIndex": null
+    },
+    {
+      "id": "group_fodzcv8go",
+      "displayName": "3 Mesh Grubu",
+      "icon": null,
+      "targetMeshNames": [
+        "135____011",
+        "136____011",
+        "136____011_1"
+      ],
+      "options": [],
+      "defaultOptionIndex": null,
+      "selectedOptionIndex": null
+    }
+  ]
+}

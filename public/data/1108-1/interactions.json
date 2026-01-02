@@ -1,0 +1,33 @@
+{
+  "zones": [
+    {
+      "id": "zone_3gujbg13w",
+      "position": [
+        17.5,
+        18.6238103983174,
+        -2.5
+      ],
+      "radius": 1.7,
+      "triggerType": "proximity",
+      "popup": {
+        "title": "Salon ",
+        "content": "Alanı 35 metrekare olup. Güney ve doğu cephelerine bakmaktadır. ",
+        "mediaType": "image",
+        "mediaUrl": "blob:http://localhost:5173/c57d49bb-2129-40c5-9087-003c709acad8",
+        "style": {
+          "backgroundColor": "#111618",
+          "textColor": "#ffffff",
+          "opacity": 0.95,
+          "padding": 34,
+          "borderRadius": 16,
+          "borderWidth": 1,
+          "borderColor": "rgba(255,255,255,0.1)",
+          "backdropBlur": 20,
+          "shadowSize": "xl",
+          "maxWidth": 352,
+          "headerBg": "rgba(255,255,255,0.05)"
+        }
+      }
+    }
+  ]
+}

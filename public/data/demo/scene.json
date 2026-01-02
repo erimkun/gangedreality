@@ -1,0 +1,24 @@
+{
+  "environment": {
+    "hdri": null,
+    "intensity": 1.0,
+    "rotation": 0,
+    "backgroundBlurriness": 0.1
+  },
+  "lights": [
+    {
+      "id": "light_default_sun",
+      "type": "directional",
+      "position": [10, 20, 10],
+      "intensity": 2.0,
+      "color": "#ffffff",
+      "castShadow": true
+    }
+  ],
+  "player": {
+    "startPosition": [0, 1.7, 5],
+    "startRotation": [0, 0, 0],
+    "moveSpeed": 2.0,
+    "eyeHeight": 1.7
+  }
+}

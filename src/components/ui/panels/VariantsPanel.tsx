@@ -1,0 +1,873 @@
+/**
+ * Variants Panel - Material variants and configurator management
+ */
+
+import { useState, useEffect } from 'react'
+import { useVariantsStore } from '../../../store/useVariantsStore'
+import { useEditorStore } from '../../../store/useEditorStore'
+import { EmptyState } from './shared'
+
+// ============================================
+// Types
+// ============================================
+
+interface PreAssetMaterial {
+  id: string
+  name: string
+  category: string
+  textureUrl: string
+  thumbnail?: string
+  normalMapUrl?: string
+}
+
+interface BuiltInMaterial {
+  id: string
+  name: string
+  category: string
+  color: string
+  metalness: number
+  roughness: number
+}
+
+// ============================================
+// Constants
+// ============================================
+
+// Built-in color materials from MaterialLibrary
+const builtInMaterials: BuiltInMaterial[] = [
+  // Metals
+  { id: 'gold', name: 'Altın', category: 'metal', color: '#FFD700', metalness: 1, roughness: 0.2 },
+  { id: 'silver', name: 'Gümüş', category: 'metal', color: '#C0C0C0', metalness: 1, roughness: 0.15 },
+  { id: 'copper', name: 'Bakır', category: 'metal', color: '#B87333', metalness: 1, roughness: 0.3 },
+  { id: 'bronze', name: 'Bronz', category: 'metal', color: '#CD7F32', metalness: 0.9, roughness: 0.4 },
+  { id: 'chrome', name: 'Krom', category: 'metal', color: '#E8E8E8', metalness: 1, roughness: 0.05 },
+  { id: 'steel', name: 'Çelik', category: 'metal', color: '#71797E', metalness: 0.95, roughness: 0.25 },
+  // Woods
+  { id: 'oak', name: 'Meşe', category: 'wood', color: '#806517', metalness: 0, roughness: 0.7 },
+  { id: 'walnut', name: 'Ceviz', category: 'wood', color: '#5C4033', metalness: 0, roughness: 0.65 },
+  { id: 'maple', name: 'Akçaağaç', category: 'wood', color: '#F5DEB3', metalness: 0, roughness: 0.6 },
+  { id: 'mahogany', name: 'Maun', category: 'wood', color: '#C04000', metalness: 0, roughness: 0.55 },
+  // Fabrics
+  { id: 'leather-black', name: 'Siyah Deri', category: 'fabric', color: '#1a1a1a', metalness: 0, roughness: 0.5 },
+  { id: 'leather-brown', name: 'Kahve Deri', category: 'fabric', color: '#8B4513', metalness: 0, roughness: 0.5 },
+  { id: 'velvet-red', name: 'Kırmızı Kadife', category: 'fabric', color: '#8B0000', metalness: 0, roughness: 0.9 },
+  { id: 'velvet-blue', name: 'Mavi Kadife', category: 'fabric', color: '#191970', metalness: 0, roughness: 0.9 },
+  // Stone
+  { id: 'marble-white', name: 'Beyaz Mermer', category: 'stone', color: '#F5F5F5', metalness: 0, roughness: 0.3 },
+  { id: 'marble-black', name: 'Siyah Mermer', category: 'stone', color: '#1C1C1C', metalness: 0, roughness: 0.25 },
+  { id: 'granite', name: 'Granit', category: 'stone', color: '#676767', metalness: 0, roughness: 0.6 },
+  // Plastics
+  { id: 'plastic-white', name: 'Beyaz Plastik', category: 'plastic', color: '#FFFFFF', metalness: 0, roughness: 0.4 },
+  { id: 'plastic-black', name: 'Siyah Plastik', category: 'plastic', color: '#0D0D0D', metalness: 0, roughness: 0.35 },
+  { id: 'rubber', name: 'Kauçuk', category: 'plastic', color: '#2F2F2F', metalness: 0, roughness: 0.95 },
+]
+
+const materialCategories = [
+  { id: 'metal', name: 'Metal', icon: '🔩' },
+  { id: 'wood', name: 'Ahşap', icon: '🪵' },
+  { id: 'fabric', name: 'Kumaş', icon: '🧵' },
+  { id: 'stone', name: 'Taş', icon: '🪨' },
+  { id: 'plastic', name: 'Plastik', icon: '🧴' },
+]
+
+// ============================================
+// Main Component
+// ============================================
+
+export default function VariantsPanel() {
+  const { configurableGroups, createGroup, selectOption, addOption, removeGroup, updateGroup, addMeshToGroup, removeMeshFromGroup, removeOption } = useVariantsStore()
+  const { selectedMeshName, selectedMeshNames } = useEditorStore()
+  
+  // State
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
+  const [addMode, setAddMode] = useState<'color' | 'texture' | 'preset' | null>(null)
+  const [newColor, setNewColor] = useState('#ffffff')
+  const [newName, setNewName] = useState('')
+  const [textureFile, setTextureFile] = useState<File | null>(null)
+  const [texturePreview, setTexturePreview] = useState<string | null>(null)
+  const [preAssets, setPreAssets] = useState<PreAssetMaterial[]>([])
+  const [showPreAssets, setShowPreAssets] = useState(false)
+  const [preAssetFilter, setPreAssetFilter] = useState<string>('')
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+  const [editGroupName, setEditGroupName] = useState('')
+  const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<string | null>(null)
+  
+  // Load pre-assets on mount
+  useEffect(() => {
+    fetch('/pre-assets/materials.json')
+      .then(res => res.json())
+      .then(data => setPreAssets(data.materials || []))
+      .catch(err => console.error('Failed to load pre-assets:', err))
+  }, [])
+  
+  // ============================================
+  // Handlers
+  // ============================================
+  
+  const handleCreateGroup = () => {
+    const meshNames = selectedMeshNames.length > 0 ? selectedMeshNames : (selectedMeshName ? [selectedMeshName] : [])
+    if (meshNames.length > 0) {
+      const groupName = meshNames.length > 1 
+        ? `${meshNames.length} Mesh Grubu` 
+        : `${meshNames[0]} Grubu`
+      createGroup(groupName, meshNames)
+    }
+  }
+
+  const handleAddColor = (groupId: string) => {
+    if (newName.trim()) {
+      addOption(groupId, {
+        name: newName.trim(),
+        type: 'color',
+        value: newColor
+      })
+      resetAddForm()
+    }
+  }
+
+  const handleTextureSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setTextureFile(file)
+      const preview = URL.createObjectURL(file)
+      setTexturePreview(preview)
+    }
+  }
+
+  const handleAddTexture = (groupId: string) => {
+    if (newName.trim() && textureFile && texturePreview) {
+      // Store texture file for later export
+      const win = window as Window & { __loadedTextures?: Map<string, File> }
+      if (!win.__loadedTextures) {
+        win.__loadedTextures = new Map()
+      }
+      const textureFileName = `variant_${Date.now()}_${textureFile.name}`
+      win.__loadedTextures.set(textureFileName, textureFile)
+      
+      addOption(groupId, {
+        name: newName.trim(),
+        type: 'texture',
+        textureUrl: texturePreview,
+        tiling: [1, 1]
+      })
+      resetAddForm()
+    }
+  }
+
+  const handleAddPreAsset = (groupId: string, asset: PreAssetMaterial) => {
+    addOption(groupId, {
+      name: asset.name,
+      type: 'texture',
+      textureUrl: asset.textureUrl,
+      tiling: [1, 1]
+    })
+    resetAddForm()
+  }
+
+  const handleAddBuiltInMaterial = (groupId: string, material: BuiltInMaterial) => {
+    addOption(groupId, {
+      name: material.name,
+      type: 'color',
+      value: material.color,
+      metalness: material.metalness,
+      roughness: material.roughness
+    })
+    resetAddForm()
+  }
+
+  const resetAddForm = () => {
+    setActiveGroupId(null)
+    setAddMode(null)
+    setNewName('')
+    setNewColor('#ffffff')
+    setTextureFile(null)
+    if (texturePreview) {
+      URL.revokeObjectURL(texturePreview)
+    }
+    setTexturePreview(null)
+    setShowPreAssets(false)
+    setPreAssetFilter('')
+    setSelectedMaterialCategory(null)
+  }
+
+  const openAddPanel = (groupId: string) => {
+    setActiveGroupId(groupId)
+    setAddMode(null)
+  }
+
+  const openEditPanel = (group: typeof configurableGroups[0]) => {
+    setEditingGroupId(group.id)
+    setEditGroupName(group.displayName)
+  }
+
+  const handleSaveGroupEdit = () => {
+    if (editingGroupId && editGroupName.trim()) {
+      updateGroup(editingGroupId, { displayName: editGroupName.trim() })
+    }
+    setEditingGroupId(null)
+    setEditGroupName('')
+  }
+
+  const handleDeleteGroup = (groupId: string) => {
+    if (confirm('Bu varyant grubunu silmek istediğinize emin misiniz?')) {
+      removeGroup(groupId)
+    }
+  }
+
+  const handleRemoveMesh = (groupId: string, meshName: string) => {
+    removeMeshFromGroup(groupId, meshName)
+  }
+
+  const handleAddCurrentMeshToGroup = (groupId: string) => {
+    const meshNames = selectedMeshNames.length > 0 ? selectedMeshNames : (selectedMeshName ? [selectedMeshName] : [])
+    meshNames.forEach(name => addMeshToGroup(groupId, name))
+  }
+
+  const handleDeleteOption = (groupId: string, optionIndex: number) => {
+    if (confirm('Bu seçeneği silmek istediğinize emin misiniz?')) {
+      removeOption(groupId, optionIndex)
+    }
+  }
+
+  // Helper function to adjust color brightness for metallic effect
+  const adjustBrightness = (hex: string, percent: number) => {
+    const num = parseInt(hex.replace('#', ''), 16)
+    const amt = Math.round(2.55 * percent)
+    const R = Math.min(255, Math.max(0, (num >> 16) + amt))
+    const G = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amt))
+    const B = Math.min(255, Math.max(0, (num & 0x0000FF) + amt))
+    return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`
+  }
+  
+  // ============================================
+  // Render
+  // ============================================
+  
+  return (
+    <div className="space-y-4">
+      {selectedMeshName || selectedMeshNames.length > 0 ? (
+        <button 
+          onClick={handleCreateGroup}
+          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors text-sm"
+        >
+          🎨 {selectedMeshNames.length > 1 ? `${selectedMeshNames.length} Mesh'i` : 'Seçili Mesh\'i'} Varyant Yap
+        </button>
+      ) : (
+        <EmptyState 
+          icon="🎨"
+          title="Varyasyon grubu oluşturmak için bir mesh seçin"
+        />
+      )}
+      
+      {/* Groups List */}
+      <div className="space-y-3">
+        {configurableGroups.map(group => (
+          <div key={group.id} className="bg-editor-bg rounded-lg p-3">
+            {/* Group Header */}
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-white text-sm font-medium">{group.displayName}</h4>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => openEditPanel(group)}
+                  className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                  title="Düzenle"
+                >
+                  ✏️
+                </button>
+                <button
+                  onClick={() => handleDeleteGroup(group.id)}
+                  className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
+                  title="Sil"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+
+            {/* Edit Mode */}
+            {editingGroupId === group.id ? (
+              <GroupEditForm 
+                group={group}
+                editGroupName={editGroupName}
+                setEditGroupName={setEditGroupName}
+                handleSaveGroupEdit={handleSaveGroupEdit}
+                handleRemoveMesh={handleRemoveMesh}
+                handleAddCurrentMeshToGroup={handleAddCurrentMeshToGroup}
+                selectedMeshName={selectedMeshName}
+                selectedMeshNames={selectedMeshNames}
+                onCancel={() => setEditingGroupId(null)}
+              />
+            ) : (
+              <p className="text-xs text-gray-400 mb-2">
+                Meshler: {group.targetMeshNames.join(', ')}
+              </p>
+            )}
+            
+            {/* Options Grid */}
+            <div className="flex gap-2 flex-wrap items-center mb-2">
+              {group.options.map((option, idx) => (
+                <OptionButton 
+                  key={idx}
+                  option={option}
+                  isSelected={group.selectedOptionIndex === idx}
+                  onSelect={() => selectOption(group.id, idx)}
+                  onDelete={() => handleDeleteOption(group.id, idx)}
+                  adjustBrightness={adjustBrightness}
+                />
+              ))}
+              
+              {/* Add Button */}
+              <button 
+                onClick={() => openAddPanel(group.id)}
+                className="w-10 h-10 rounded-lg border-2 border-dashed border-gray-500 text-gray-500 hover:border-purple-400 hover:text-purple-400 transition-colors text-xl flex items-center justify-center"
+              >
+                +
+              </button>
+            </div>
+
+            {/* Add Panel */}
+            {activeGroupId === group.id && (
+              <AddOptionPanel 
+                groupId={group.id}
+                addMode={addMode}
+                setAddMode={setAddMode}
+                newName={newName}
+                setNewName={setNewName}
+                newColor={newColor}
+                setNewColor={setNewColor}
+                texturePreview={texturePreview}
+                showPreAssets={showPreAssets}
+                setShowPreAssets={setShowPreAssets}
+                preAssetFilter={preAssetFilter}
+                setPreAssetFilter={setPreAssetFilter}
+                preAssets={preAssets}
+                selectedMaterialCategory={selectedMaterialCategory}
+                setSelectedMaterialCategory={setSelectedMaterialCategory}
+                handleTextureSelect={handleTextureSelect}
+                handleAddColor={handleAddColor}
+                handleAddTexture={handleAddTexture}
+                handleAddPreAsset={handleAddPreAsset}
+                handleAddBuiltInMaterial={handleAddBuiltInMaterial}
+                resetAddForm={resetAddForm}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// Sub-components
+// ============================================
+
+interface OptionButtonProps {
+  option: {
+    name: string
+    type: string
+    value?: string
+    textureUrl?: string
+    metalness?: number
+    roughness?: number
+  }
+  isSelected: boolean
+  onSelect: () => void
+  onDelete: () => void
+  adjustBrightness: (hex: string, percent: number) => string
+}
+
+function OptionButton({ option, isSelected, onSelect, onDelete, adjustBrightness }: OptionButtonProps) {
+  return (
+    <div className="relative group">
+      <button 
+        onClick={onSelect}
+        className={`w-10 h-10 rounded-lg border-2 transition-all overflow-hidden ${
+          isSelected 
+            ? 'border-purple-400 ring-2 ring-purple-400/50' 
+            : 'border-gray-600 hover:border-gray-400'
+        }`}
+        title={option.name}
+        style={option.type === 'color' ? {
+          background: option.metalness && option.metalness > 0.5
+            ? `linear-gradient(135deg, ${adjustBrightness(option.value || '#fff', 30)} 0%, ${option.value} 50%, ${adjustBrightness(option.value || '#fff', -30)} 100%)`
+            : option.value
+        } : undefined}
+      >
+        {option.type === 'texture' && option.textureUrl && (
+          <img 
+            src={option.textureUrl} 
+            alt={option.name} 
+            className="w-full h-full object-cover"
+          />
+        )}
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete() }}
+        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+        title="Seçeneği Sil"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+interface GroupEditFormProps {
+  group: { id: string; displayName: string; targetMeshNames: string[] }
+  editGroupName: string
+  setEditGroupName: (name: string) => void
+  handleSaveGroupEdit: () => void
+  handleRemoveMesh: (groupId: string, meshName: string) => void
+  handleAddCurrentMeshToGroup: (groupId: string) => void
+  selectedMeshName: string | null
+  selectedMeshNames: string[]
+  onCancel: () => void
+}
+
+function GroupEditForm({ 
+  group, 
+  editGroupName, 
+  setEditGroupName, 
+  handleSaveGroupEdit, 
+  handleRemoveMesh, 
+  handleAddCurrentMeshToGroup,
+  selectedMeshName,
+  selectedMeshNames,
+  onCancel 
+}: GroupEditFormProps) {
+  return (
+    <div className="space-y-3 mb-3 p-3 bg-editor-panel rounded-lg border border-blue-500/50">
+      <div>
+        <label className="text-xs text-gray-400 block mb-1">Grup Adı</label>
+        <input
+          type="text"
+          value={editGroupName}
+          onChange={(e) => setEditGroupName(e.target.value)}
+          className="w-full bg-editor-bg border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+        />
+      </div>
+      
+      <div>
+        <label className="text-xs text-gray-400 block mb-1">Bağlı Meshler</label>
+        <div className="flex flex-wrap gap-1">
+          {group.targetMeshNames.map((meshName, idx) => (
+            <span 
+              key={idx}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-editor-bg rounded text-xs text-gray-300"
+            >
+              {meshName}
+              <button
+                onClick={() => handleRemoveMesh(group.id, meshName)}
+                className="text-red-400 hover:text-red-300"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        {(selectedMeshName || selectedMeshNames.length > 0) && (
+          <button
+            onClick={() => handleAddCurrentMeshToGroup(group.id)}
+            className="mt-2 text-xs text-purple-400 hover:text-purple-300"
+          >
+            + Seçili mesh'i ekle
+          </button>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleSaveGroupEdit}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded text-xs"
+        >
+          Kaydet
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-1.5 rounded text-xs"
+        >
+          İptal
+        </button>
+      </div>
+    </div>
+  )
+}
+
+interface AddOptionPanelProps {
+  groupId: string
+  addMode: 'color' | 'texture' | 'preset' | null
+  setAddMode: (mode: 'color' | 'texture' | 'preset' | null) => void
+  newName: string
+  setNewName: (name: string) => void
+  newColor: string
+  setNewColor: (color: string) => void
+  texturePreview: string | null
+  showPreAssets: boolean
+  setShowPreAssets: (show: boolean) => void
+  preAssetFilter: string
+  setPreAssetFilter: (filter: string) => void
+  preAssets: PreAssetMaterial[]
+  selectedMaterialCategory: string | null
+  setSelectedMaterialCategory: (category: string | null) => void
+  handleTextureSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  handleAddColor: (groupId: string) => void
+  handleAddTexture: (groupId: string) => void
+  handleAddPreAsset: (groupId: string, asset: PreAssetMaterial) => void
+  handleAddBuiltInMaterial: (groupId: string, material: BuiltInMaterial) => void
+  resetAddForm: () => void
+}
+
+function AddOptionPanel({
+  groupId,
+  addMode,
+  setAddMode,
+  newName,
+  setNewName,
+  newColor,
+  setNewColor,
+  texturePreview,
+  showPreAssets,
+  setShowPreAssets,
+  preAssetFilter,
+  setPreAssetFilter,
+  preAssets,
+  selectedMaterialCategory,
+  setSelectedMaterialCategory,
+  handleTextureSelect,
+  handleAddColor,
+  handleAddTexture,
+  handleAddPreAsset,
+  handleAddBuiltInMaterial,
+  resetAddForm
+}: AddOptionPanelProps) {
+  return (
+    <div className="mt-3 p-3 bg-editor-panel rounded-lg border border-gray-600">
+      {/* Mode Selection */}
+      {!addMode && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setAddMode('preset')}
+            className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs"
+          >
+            🎨 Hazır Materyal
+          </button>
+          <button
+            onClick={() => setAddMode('color')}
+            className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs"
+          >
+            🎨 Renk
+          </button>
+          <button
+            onClick={() => setAddMode('texture')}
+            className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs"
+          >
+            🖼️ Doku
+          </button>
+        </div>
+      )}
+
+      {/* Color Picker */}
+      {addMode === 'color' && (
+        <ColorAddForm 
+          newName={newName}
+          setNewName={setNewName}
+          newColor={newColor}
+          setNewColor={setNewColor}
+          onAdd={() => handleAddColor(groupId)}
+          onCancel={resetAddForm}
+        />
+      )}
+
+      {/* Texture Upload */}
+      {(addMode === 'texture' || addMode === 'preset') && (
+        <TextureAddForm 
+          addMode={addMode}
+          newName={newName}
+          setNewName={setNewName}
+          texturePreview={texturePreview}
+          showPreAssets={showPreAssets}
+          setShowPreAssets={setShowPreAssets}
+          preAssetFilter={preAssetFilter}
+          setPreAssetFilter={setPreAssetFilter}
+          preAssets={preAssets}
+          selectedMaterialCategory={selectedMaterialCategory}
+          setSelectedMaterialCategory={setSelectedMaterialCategory}
+          groupId={groupId}
+          handleTextureSelect={handleTextureSelect}
+          handleAddTexture={handleAddTexture}
+          handleAddPreAsset={handleAddPreAsset}
+          handleAddBuiltInMaterial={handleAddBuiltInMaterial}
+          onCancel={resetAddForm}
+        />
+      )}
+    </div>
+  )
+}
+
+interface ColorAddFormProps {
+  newName: string
+  setNewName: (name: string) => void
+  newColor: string
+  setNewColor: (color: string) => void
+  onAdd: () => void
+  onCancel: () => void
+}
+
+function ColorAddForm({ newName, setNewName, newColor, setNewColor, onAdd, onCancel }: ColorAddFormProps) {
+  return (
+    <div className="space-y-2">
+      <input
+        type="text"
+        value={newName}
+        onChange={(e) => setNewName(e.target.value)}
+        placeholder="Varyant adı..."
+        className="w-full bg-editor-bg border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+      />
+      <div className="flex gap-2 items-center">
+        <input
+          type="color"
+          value={newColor}
+          onChange={(e) => setNewColor(e.target.value)}
+          className="w-10 h-10 rounded cursor-pointer border border-gray-600"
+        />
+        <input
+          type="text"
+          value={newColor}
+          onChange={(e) => setNewColor(e.target.value)}
+          className="flex-1 bg-editor-bg border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={onAdd}
+          disabled={!newName.trim()}
+          className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded text-xs"
+        >
+          Ekle
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs"
+        >
+          İptal
+        </button>
+      </div>
+    </div>
+  )
+}
+
+interface TextureAddFormProps {
+  addMode: 'texture' | 'preset'
+  newName: string
+  setNewName: (name: string) => void
+  texturePreview: string | null
+  showPreAssets: boolean
+  setShowPreAssets: (show: boolean) => void
+  preAssetFilter: string
+  setPreAssetFilter: (filter: string) => void
+  preAssets: PreAssetMaterial[]
+  selectedMaterialCategory: string | null
+  setSelectedMaterialCategory: (category: string | null) => void
+  groupId: string
+  handleTextureSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  handleAddTexture: (groupId: string) => void
+  handleAddPreAsset: (groupId: string, asset: PreAssetMaterial) => void
+  handleAddBuiltInMaterial: (groupId: string, material: BuiltInMaterial) => void
+  onCancel: () => void
+}
+
+function TextureAddForm({
+  addMode,
+  newName,
+  setNewName,
+  texturePreview,
+  showPreAssets,
+  setShowPreAssets,
+  preAssetFilter,
+  setPreAssetFilter,
+  preAssets,
+  selectedMaterialCategory,
+  setSelectedMaterialCategory,
+  groupId,
+  handleTextureSelect,
+  handleAddTexture,
+  handleAddPreAsset,
+  handleAddBuiltInMaterial,
+  onCancel
+}: TextureAddFormProps) {
+  // Filter pre-assets
+  const filteredPreAssets = preAssets.filter(asset => 
+    !preAssetFilter || asset.name.toLowerCase().includes(preAssetFilter.toLowerCase()) ||
+    asset.category.toLowerCase().includes(preAssetFilter.toLowerCase())
+  )
+
+  // Filter built-in materials by category
+  const filteredBuiltInMaterials = selectedMaterialCategory 
+    ? builtInMaterials.filter(m => m.category === selectedMaterialCategory)
+    : builtInMaterials
+
+  return (
+    <div className="space-y-3">
+      {/* Tab Toggle */}
+      {addMode === 'texture' && (
+        <div className="flex rounded-lg overflow-hidden border border-gray-600">
+          <button
+            onClick={() => setShowPreAssets(false)}
+            className={`flex-1 py-2 text-xs ${!showPreAssets ? 'bg-purple-600 text-white' : 'bg-editor-bg text-gray-400'}`}
+          >
+            📁 Dosyadan Yükle
+          </button>
+          <button
+            onClick={() => setShowPreAssets(true)}
+            className={`flex-1 py-2 text-xs ${showPreAssets ? 'bg-purple-600 text-white' : 'bg-editor-bg text-gray-400'}`}
+          >
+            📦 Hazır Dokular
+          </button>
+        </div>
+      )}
+
+      {/* File Upload Tab */}
+      {addMode === 'texture' && !showPreAssets && (
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Varyant adı..."
+            className="w-full bg-editor-bg border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+          />
+          
+          <label className="flex items-center justify-center gap-2 py-6 border-2 border-dashed border-gray-600 hover:border-purple-400 rounded-lg cursor-pointer transition-colors">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleTextureSelect}
+              className="hidden"
+            />
+            {texturePreview ? (
+              <img src={texturePreview} alt="Preview" className="w-16 h-16 object-cover rounded" />
+            ) : (
+              <span className="text-gray-400 text-sm">📁 Doku Seç</span>
+            )}
+          </label>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleAddTexture(groupId)}
+              disabled={!newName.trim() || !texturePreview}
+              className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded text-xs"
+            >
+              Ekle
+            </button>
+            <button
+              onClick={onCancel}
+              className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs"
+            >
+              İptal
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pre-assets Tab */}
+      {addMode === 'texture' && showPreAssets && (
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={preAssetFilter}
+            onChange={(e) => setPreAssetFilter(e.target.value)}
+            placeholder="Doku ara..."
+            className="w-full bg-editor-bg border border-gray-600 rounded px-2 py-1.5 text-white text-sm"
+          />
+          
+          <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto">
+            {filteredPreAssets.map((asset) => (
+              <button
+                key={asset.id}
+                onClick={() => handleAddPreAsset(groupId, asset)}
+                className="aspect-square rounded overflow-hidden border border-gray-600 hover:border-purple-400 transition-colors"
+                title={asset.name}
+              >
+                <img 
+                  src={asset.thumbnail || asset.textureUrl} 
+                  alt={asset.name}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+          
+          <button
+            onClick={onCancel}
+            className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs"
+          >
+            İptal
+          </button>
+        </div>
+      )}
+
+      {/* Preset Materials Tab */}
+      {addMode === 'preset' && (
+        <div className="space-y-2">
+          {/* Category Filter */}
+          <div className="flex flex-wrap gap-1">
+            <button
+              onClick={() => setSelectedMaterialCategory(null)}
+              className={`px-2 py-1 rounded text-xs ${!selectedMaterialCategory ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+            >
+              Tümü
+            </button>
+            {materialCategories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedMaterialCategory(cat.id)}
+                className={`px-2 py-1 rounded text-xs ${selectedMaterialCategory === cat.id ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+              >
+                {cat.icon} {cat.name}
+              </button>
+            ))}
+          </div>
+          
+          {/* Materials Grid */}
+          <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto">
+            {filteredBuiltInMaterials.map((material) => (
+              <button
+                key={material.id}
+                onClick={() => handleAddBuiltInMaterial(groupId, material)}
+                className="aspect-square rounded overflow-hidden border border-gray-600 hover:border-purple-400 transition-colors relative group"
+                title={material.name}
+                style={{
+                  background: material.metalness > 0.5
+                    ? `linear-gradient(135deg, ${adjustBrightness(material.color, 30)} 0%, ${material.color} 50%, ${adjustBrightness(material.color, -30)} 100%)`
+                    : material.color
+                }}
+              >
+                <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-[8px] text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity truncate px-1">
+                  {material.name}
+                </span>
+              </button>
+            ))}
+          </div>
+          
+          <button
+            onClick={onCancel}
+            className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs"
+          >
+            İptal
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Helper function (duplicate to avoid circular import)
+function adjustBrightness(hex: string, percent: number) {
+  const num = parseInt(hex.replace('#', ''), 16)
+  const amt = Math.round(2.55 * percent)
+  const R = Math.min(255, Math.max(0, (num >> 16) + amt))
+  const G = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amt))
+  const B = Math.min(255, Math.max(0, (num & 0x0000FF) + amt))
+  return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`
+}

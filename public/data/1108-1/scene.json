@@ -1,0 +1,66 @@
+{
+  "environment": {
+    "hdri": null,
+    "intensity": 1,
+    "rotation": 0,
+    "backgroundBlurriness": 0.1
+  },
+  "lights": [
+    {
+      "id": "default_sun",
+      "type": "directional",
+      "position": [
+        29,
+        20,
+        -4.5
+      ],
+      "intensity": 4.1,
+      "color": "#ffffee",
+      "castShadow": true,
+      "target": [
+        -10,
+        15.5,
+        0.5
+      ]
+    },
+    {
+      "id": "light_u69zpblsn",
+      "type": "point",
+      "position": [
+        10.5,
+        20,
+        -2
+      ],
+      "intensity": 1.5,
+      "color": "#ffffff",
+      "castShadow": true
+    }
+  ],
+  "player": {
+    "startPosition": [
+      15.0201088859819,
+      19.0115526445637,
+      -3.16077437178676
+    ],
+    "startRotation": [
+      0,
+      -1.5707963267948966,
+      0
+    ],
+    "moveSpeed": 2,
+    "eyeHeight": 1.7
+  },
+  "camera": {
+    "position": [
+      18.08874644558123,
+      21.54271864514415,
+      11.291121765381023
+    ],
+    "target": [
+      16.5935881453688,
+      20.49676990220203,
+      6.635964100549071
+    ],
+    "fov": 50
+  }
+}
