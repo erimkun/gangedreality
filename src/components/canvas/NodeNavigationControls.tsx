@@ -33,8 +33,19 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
     if (enabled && startPosition) {
       // User sets the exact camera position for start in editor, so use it directly
       camera.position.set(startPosition[0], startPosition[1], startPosition[2])
-      // Ensure rotation order is YXZ for FPS style look
+      
+      // IMPORTANT: Before changing rotation order, extract the current look direction
+      // and recalculate proper YXZ euler angles without roll
+      const currentQuat = camera.quaternion.clone()
+      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(currentQuat)
+      
+      // Calculate yaw (Y rotation) and pitch (X rotation) from direction
+      const yaw = Math.atan2(-direction.x, -direction.z)
+      const pitch = Math.asin(Math.max(-1, Math.min(1, direction.y))) // Clamp for safety
+      
+      // Now set rotation order and apply clean YXZ rotation (no roll)
       camera.rotation.order = 'YXZ'
+      camera.rotation.set(pitch, yaw, 0) // pitch, yaw, roll=0
       
       // Initial update
       if (onPositionChange) {

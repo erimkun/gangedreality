@@ -21,9 +21,22 @@ const MouseIcon = ({ button, action }: { button: 'left' | 'right', action?: 'dra
   </svg>
 );
 
-const KeyboardKey = ({ children }: { children: React.ReactNode }) => (
-  <div className="w-6 h-6 rounded bg-white/10 border border-white/20 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+const KeyboardKey = ({ children, variant = 'default' }: { children: React.ReactNode, variant?: 'default' | 'highlight' }) => (
+  <div className={`w-6 h-6 rounded border flex items-center justify-center text-[10px] font-bold shrink-0 ${
+    variant === 'highlight' 
+      ? 'bg-white/20 border-white/30 text-white' 
+      : 'bg-white/10 border-white/20 text-white/70'
+  }`}>
     {children}
+  </div>
+);
+
+const KeyWithArrow = ({ keyLabel, direction }: { keyLabel: string, direction: 'up' | 'down' }) => (
+  <div className="flex flex-col items-center gap-0.5">
+    <span className="text-[8px] text-white/50">
+      {direction === 'up' ? '▲' : '▼'}
+    </span>
+    <KeyboardKey>{keyLabel}</KeyboardKey>
   </div>
 );
 
@@ -65,11 +78,15 @@ export const ControlsInfo: React.FC = () => {
             <MouseIcon button="left" />
             <span className="text-white/50 text-xs">+</span>
             <div className="flex flex-col items-center gap-1">
-              <KeyboardKey>W</KeyboardKey>
+              <div className="flex gap-1 items-end">
+                <KeyWithArrow keyLabel="Q" direction="down" />
+                <KeyboardKey variant="highlight">W</KeyboardKey>
+                <KeyWithArrow keyLabel="E" direction="up" />
+              </div>
               <div className="flex gap-1">
-                <KeyboardKey>A</KeyboardKey>
-                <KeyboardKey>S</KeyboardKey>
-                <KeyboardKey>D</KeyboardKey>
+                <KeyboardKey variant="highlight">A</KeyboardKey>
+                <KeyboardKey variant="highlight">S</KeyboardKey>
+                <KeyboardKey variant="highlight">D</KeyboardKey>
               </div>
             </div>
           </div>

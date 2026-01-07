@@ -111,13 +111,14 @@ function CameraTransitionManager({
         endTarget.current.set(target.lookAt[0], target.lookAt[1], target.lookAt[2])
       } else if (target.rot) {
         // Calculate look direction from rotation (YXZ order usually for player)
-        const euler = new THREE.Euler(target.rot[0], target.rot[1], target.rot[2], 'YXZ')
+        // Only use pitch (X) and yaw (Y), ignore roll (Z) to prevent dizziness
+        const euler = new THREE.Euler(target.rot[0], target.rot[1], 0, 'YXZ')
         const direction = new THREE.Vector3(0, 0, -1).applyEuler(euler)
         // Target is position + direction
         endTarget.current.copy(endPos.current).add(direction)
       }
 
-      // Calculate End Rotation Quaternion
+      // Calculate End Rotation Quaternion (also without roll via lookAt)
       const m = new THREE.Matrix4()
       m.lookAt(endPos.current, endTarget.current, new THREE.Vector3(0, 1, 0))
       endQuat.current.setFromRotationMatrix(m)

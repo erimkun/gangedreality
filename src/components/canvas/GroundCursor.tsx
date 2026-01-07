@@ -60,7 +60,7 @@ export default function GroundCursor({ position, visible }: GroundCursorProps) {
       visible={visible}
       position={position}
     >
-      <planeGeometry args={[settings.cursorSize / 3, settings.cursorSize / 3]} />
+      <planeGeometry args={[settings.cursorSize / 2, settings.cursorSize / 2]} />
       <meshBasicMaterial 
         map={texture} 
         transparent 
