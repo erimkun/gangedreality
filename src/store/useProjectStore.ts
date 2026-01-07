@@ -9,6 +9,7 @@ import {
 import { useSceneStore } from './useSceneStore'
 import { useInteractionsStore } from './useInteractionsStore'
 import { useVariantsStore } from './useVariantsStore'
+import { useHotspotStore } from './useHotspotStore'
 
 // Debug logger
 const DEBUG = true
@@ -92,10 +93,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       log('loadProject', { projectData })
       
       // Load other config files
-      const [sceneRes, interactionsRes, variantsRes] = await Promise.all([
+      const [sceneRes, interactionsRes, variantsRes, hotspotsRes] = await Promise.all([
         fetch(`/data/${projectId}/scene.json`).catch(() => null),
         fetch(`/data/${projectId}/interactions.json`).catch(() => null),
-        fetch(`/data/${projectId}/variants.json`).catch(() => null)
+        fetch(`/data/${projectId}/variants.json`).catch(() => null),
+        fetch(`/data/${projectId}/hotspots.json`).catch(() => null)
       ])
       
       // Convert relative model path to absolute path
@@ -140,19 +142,106 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // Update scene store if scene.json exists
       if (sceneRes?.ok) {
         const sceneData = await sceneRes.json()
+        
+        // Resolve custom HDRI path
+        if (sceneData.environment && sceneData.environment.customHdriUrl) {
+             const url = sceneData.environment.customHdriUrl
+             if (!url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
+                 sceneData.environment.customHdriUrl = `/data/${projectId}/${url}`
+             }
+        }
+        
         useSceneStore.getState().loadFromConfig(sceneData)
       }
       
       // Update interactions store if interactions.json exists
       if (interactionsRes?.ok) {
         const interactionsData = await interactionsRes.json()
+        
+        // Resolve relative paths in interactions (images, etc)
+        if (interactionsData.zones) {
+            interactionsData.zones.forEach((zone: any) => {
+                // Resolve popup header mediaUrl
+                if (zone.popup?.mediaUrl && !zone.popup.mediaUrl.startsWith('/') && !zone.popup.mediaUrl.startsWith('http') && !zone.popup.mediaUrl.startsWith('blob:')) {
+                     zone.popup.mediaUrl = `/data/${projectId}/${zone.popup.mediaUrl}`
+                }
+                
+                // Resolve block images
+                if (zone.popup?.blocks) {
+                    zone.popup.blocks.forEach((block: any) => {
+                        if (block.type === 'image' && block.content && !block.content.startsWith('/') && !block.content.startsWith('http') && !block.content.startsWith('blob:')) {
+                            block.content = `/data/${projectId}/${block.content}`
+                        }
+                    })
+                }
+            })
+        }
+        
         useInteractionsStore.getState().loadFromConfig(interactionsData)
       }
       
       // Update variants store if variants.json exists
       if (variantsRes?.ok) {
         const variantsData = await variantsRes.json()
+        
+        // Resolve relative paths in variants
+        if (variantsData.configurableGroups) {
+          variantsData.configurableGroups.forEach((group: any) => {
+            if (group.options) {
+              group.options.forEach((option: any) => {
+                // Helper to resolve url
+                const resolveUrl = (url: string | undefined) => {
+                  if (url && !url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
+                    return `/data/${projectId}/${url}`
+                  }
+                  return url
+                }
+
+                option.textureUrl = resolveUrl(option.textureUrl)
+                option.normalMapUrl = resolveUrl(option.normalMapUrl)
+                option.roughnessMapUrl = resolveUrl(option.roughnessMapUrl)
+              })
+            }
+          })
+        }
+
         useVariantsStore.getState().loadFromConfig(variantsData)
+      }
+
+      // Update hotspots store if hotspots.json exists
+      if (hotspotsRes?.ok) {
+        try {
+          const hotspotsData = await hotspotsRes.json()
+          
+          // Resolve custom icons in nodes
+          if (hotspotsData.settings && hotspotsData.settings.defaultCustomIconUrl) {
+               const url = hotspotsData.settings.defaultCustomIconUrl
+               if (!url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
+                   hotspotsData.settings.defaultCustomIconUrl = `/data/${projectId}/${url}`
+               }
+          }
+
+          if (hotspotsData.nodes) {
+              hotspotsData.nodes.forEach((node: any) => {
+                  if (node.customIconUrl && !node.customIconUrl.startsWith('/') && !node.customIconUrl.startsWith('http') && !node.customIconUrl.startsWith('blob:')) {
+                      node.customIconUrl = `/data/${projectId}/${node.customIconUrl}`
+                  }
+              })
+          }
+          
+          // Resolve default custom icon
+          if (hotspotsData.settings && hotspotsData.settings.defaultCustomIconUrl) {
+               const url = hotspotsData.settings.defaultCustomIconUrl
+               if (url && !url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
+                   hotspotsData.settings.defaultCustomIconUrl = `/data/${projectId}/${url}`
+               }
+          }
+          
+          useHotspotStore.getState().setNodes(hotspotsData.nodes || [])
+          useHotspotStore.getState().updateSettings(hotspotsData.settings || {})
+        } catch (e) {
+          console.warn('Failed to parse hotspots.json', e)
+        }
       }
       
       return true
@@ -284,7 +373,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       },
       scene: useSceneStore.getState().getConfig(),
       interactions: useInteractionsStore.getState().getConfig(),
-      variants: useVariantsStore.getState().getConfig()
+      variants: useVariantsStore.getState().getConfig(),
+      hotspots: {
+        nodes: useHotspotStore.getState().nodes,
+        settings: useHotspotStore.getState().settings
+      }
     }
   },
 

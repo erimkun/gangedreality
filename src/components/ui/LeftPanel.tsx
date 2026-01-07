@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useEditorStore } from '@/store/useEditorStore'
 import { useSceneStore } from '@/store/useSceneStore'
 import { useInteractionsStore } from '@/store/useInteractionsStore'
+import { useToastStore } from '@/store/useToastStore'
 
 // Type for mesh info
 type MeshInfo = {
@@ -24,12 +25,22 @@ export default function LeftPanel({ onModelUpload }: LeftPanelProps) {
     hiddenMeshIds,
     selectObject,
     toggleMeshVisibility,
-    setActivePanel
+    setActivePanel,
+    deleteObject
   } = useEditorStore()
+  
+  const { addToast } = useToastStore()
   
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['meshes', 'lights', 'zones']))
   const [isCollapsed, setIsCollapsed] = useState(false)
+  
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean, id: string | null, name: string }>({
+    isOpen: false,
+    id: null,
+    name: ''
+  })
 
   // Auto-scroll to selected item and expand its group
   useEffect(() => {
@@ -57,16 +68,16 @@ export default function LeftPanel({ onModelUpload }: LeftPanelProps) {
   }, [selectedObjectIds, sceneMeshes, expandedGroups])
 
   // Filter meshes by search
-  const filteredMeshes = sceneMeshes.filter(mesh => 
+  const filteredMeshes = useMemo(() => sceneMeshes.filter(mesh => 
     mesh.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  ), [sceneMeshes, searchQuery])
 
   // Group meshes by type
-  const groupedMeshes = {
+  const groupedMeshes = useMemo(() => ({
     meshes: filteredMeshes.filter(m => m.type === 'mesh' || m.type === 'group'),
     lights: filteredMeshes.filter(m => m.type === 'light'),
     zones: filteredMeshes.filter(m => m.type === 'zone')
-  }
+  }), [filteredMeshes])
 
   const toggleGroup = (group: string) => {
     const newExpanded = new Set(expandedGroups)
@@ -85,6 +96,18 @@ export default function LeftPanel({ onModelUpload }: LeftPanelProps) {
 
   const handleVisibilityToggle = (meshId: string) => {
     toggleMeshVisibility(meshId)
+  }
+
+  const handleDeleteRequest = (id: string, name: string) => {
+    setDeleteConfirm({ isOpen: true, id, name })
+  }
+
+  const handleConfirmDelete = () => {
+    if (deleteConfirm.id) {
+      deleteObject(deleteConfirm.id)
+      addToast(`${deleteConfirm.name} silindi`, 'success')
+      setDeleteConfirm({ isOpen: false, id: null, name: '' })
+    }
   }
 
   // Add handlers
@@ -164,6 +187,7 @@ export default function LeftPanel({ onModelUpload }: LeftPanelProps) {
           hiddenIds={hiddenMeshIds}
           onSelect={handleSelect}
           onToggleVisibility={handleVisibilityToggle}
+          onDelete={handleDeleteRequest}
         />
 
         {/* Lights Group */}
@@ -177,6 +201,7 @@ export default function LeftPanel({ onModelUpload }: LeftPanelProps) {
           hiddenIds={hiddenMeshIds}
           onSelect={handleSelect}
           onToggleVisibility={handleVisibilityToggle}
+          onDelete={handleDeleteRequest}
         />
 
         {/* Zones Group */}
@@ -190,6 +215,7 @@ export default function LeftPanel({ onModelUpload }: LeftPanelProps) {
           hiddenIds={hiddenMeshIds}
           onSelect={handleSelect}
           onToggleVisibility={handleVisibilityToggle}
+          onDelete={handleDeleteRequest}
         />
 
         {filteredMeshes.length === 0 && (
@@ -225,12 +251,43 @@ export default function LeftPanel({ onModelUpload }: LeftPanelProps) {
             onClick={handleAddZone}
           />
           <AddButton 
+            icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
+            label="Navigasyon"
+            onClick={() => setActivePanel('hotspots')}
+          />
+          <AddButton 
             icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>}
             label="Varyant"
             onClick={() => setActivePanel('variants')}
           />
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.isOpen && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1A1F22] border border-white/10 rounded-xl p-4 w-full shadow-2xl">
+            <h3 className="text-white font-medium mb-2">Objeyi Sil?</h3>
+            <p className="text-white/60 text-sm mb-4">
+              <span className="text-white font-medium">{deleteConfirm.name}</span> kalıcı olarak silinecek.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirm({ isOpen: false, id: null, name: '' })}
+                className="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/70 hover:text-white text-sm transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-sm transition-colors font-medium"
+              >
+                Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -259,6 +316,7 @@ interface MeshGroupProps {
   hiddenIds: Set<string>
   onSelect: (mesh: MeshInfo, e: React.MouseEvent) => void
   onToggleVisibility: (id: string) => void
+  onDelete: (id: string, name: string) => void
 }
 
 function MeshGroup({ 
@@ -270,7 +328,8 @@ function MeshGroup({
   selectedIds, 
   hiddenIds,
   onSelect, 
-  onToggleVisibility 
+  onToggleVisibility,
+  onDelete
 }: MeshGroupProps) {
   if (items.length === 0) return null
 
@@ -330,6 +389,23 @@ function MeshGroup({
                   )}
                 </button>
                 <span className="flex-1 truncate">{mesh.name || 'Unnamed'}</span>
+                
+                {/* Delete Button (visible on hover or selected) */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete(mesh.id, mesh.name)
+                  }}
+                  className={`size-5 rounded flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 ${
+                    isSelected ? 'text-white hover:bg-red-500/20 hover:text-red-400' : 'text-white/30 hover:text-red-400 hover:bg-white/10'
+                  }`}
+                  title="Sil"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+
                 {isSelected && (
                   <span className="size-2 rounded-full bg-primary" />
                 )}

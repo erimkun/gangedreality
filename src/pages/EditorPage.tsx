@@ -23,6 +23,8 @@ import EffectsManager from '@/components/canvas/EffectsManager'
 import ViewerPreviewModal from '@/components/ui/ViewerPreviewModal'
 import { exportProjectAsZip } from '@/utils/zipExporter'
 import { toast } from '@/store/useToastStore'
+import HotspotRenderer from '@/components/canvas/HotspotRenderer'
+import { FPSCounter } from '@/components/ui/FPSCounter'
 
 // Editor Camera Initializer - Sets camera to saved orbit position on load
 function EditorCameraInitializer() {
@@ -49,11 +51,14 @@ function EditorCameraInitializer() {
   return null
 }
 
+import { useHotspotStore } from '@/store/useHotspotStore'
+
 // Player Start Position Marker
 function PlayerStartMarker() {
   const { player, updatePlayer, updateCamera } = useSceneStore()
   const { camera, controls } = useThree()
   const meshRef = useRef<THREE.Mesh>(null)
+  const { isHotspotMode } = useHotspotStore()
 
   // Listen for "set from camera" event
   useEffect(() => {
@@ -101,6 +106,8 @@ function PlayerStartMarker() {
       meshRef.current.rotation.y += delta * 0.5
     }
   })
+
+  if (isHotspotMode) return null
 
   const pos = player.startPosition
   const rot = player.startRotation
@@ -250,6 +257,8 @@ export default function EditorPage() {
           }}
           dpr={[1, 2]}
         >
+          <FPSCounter />
+          
           {/* Default Lighting */}
           <ambientLight intensity={0.3} />
 
@@ -258,6 +267,9 @@ export default function EditorPage() {
 
           {/* Interaction Zones */}
           <InteractionZonesManager isEditor />
+
+          {/* Hotspot Nodes */}
+          <HotspotRenderer isEditor />
 
           {/* Environment */}
           {environment.hdriPreset !== 'custom' ? (
@@ -301,9 +313,9 @@ export default function EditorPage() {
             minDistance={0.5}
             maxDistance={200}
             mouseButtons={{
-              LEFT: THREE.MOUSE.PAN,
-              MIDDLE: THREE.MOUSE.DOLLY,
-              RIGHT: THREE.MOUSE.ROTATE // Right-click for orbit rotation
+              LEFT: undefined as unknown as THREE.MOUSE, // Disable Left Click (Reserved for Selection/Fly)
+              MIDDLE: THREE.MOUSE.PAN, // Middle Click to Pan
+              RIGHT: THREE.MOUSE.ROTATE // Right Click to Rotate
             }}
           />
 

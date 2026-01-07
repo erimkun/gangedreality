@@ -15,18 +15,69 @@
         "mediaType": "image",
         "mediaUrl": "blob:http://localhost:5173/c57d49bb-2129-40c5-9087-003c709acad8",
         "style": {
-          "backgroundColor": "#111618",
-          "textColor": "#ffffff",
-          "opacity": 0.95,
-          "padding": 34,
-          "borderRadius": 16,
+          "backgroundColor": "#99a4a8",
+          "textColor": "#e10909",
+          "opacity": 0.7,
+          "padding": 35,
+          "borderRadius": 5,
           "borderWidth": 1,
           "borderColor": "rgba(255,255,255,0.1)",
-          "backdropBlur": 20,
+          "backdropBlur": 28,
           "shadowSize": "xl",
           "maxWidth": 352,
           "headerBg": "rgba(255,255,255,0.05)"
-        }
+        },
+        "blocks": [
+          {
+            "id": "b_4ujtz63nb",
+            "type": "text",
+            "settings": {
+              "fontSize": 14,
+              "color": "#ffffff",
+              "textAlign": "left"
+            },
+            "content": "dfasdfdasf"
+          },
+          {
+            "id": "b_ed1hrw4tz",
+            "type": "divider",
+            "settings": {
+              "thickness": 1,
+              "dividerColor": "rgba(255,255,255,0.2)",
+              "margin": 16
+            },
+            "content": ""
+          },
+          {
+            "id": "b_ato0nving",
+            "type": "text",
+            "settings": {
+              "fontSize": 14,
+              "color": "#ffffff",
+              "textAlign": "left"
+            },
+            "content": "Yeni metin bloğu"
+          },
+          {
+            "id": "b_aazry22mk",
+            "type": "image",
+            "settings": {
+              "height": 160,
+              "objectFit": "contain"
+            },
+            "content": "/data/1108-1/textures/int_zone_3gujbg13w_b_aazry22mk_gerialbuton.png"
+          },
+          {
+            "id": "b_j3l7rqu1x",
+            "type": "divider",
+            "settings": {
+              "thickness": 1,
+              "dividerColor": "rgba(255,255,255,0.2)",
+              "margin": 16
+            },
+            "content": ""
+          }
+        ]
       }
     }
   ]

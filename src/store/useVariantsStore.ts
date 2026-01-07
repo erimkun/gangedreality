@@ -4,6 +4,7 @@ import {
   ConfigurableGroup, 
   VariantOption
 } from '@/types'
+import { useHistoryStore } from '@/hooks/useHistory'
 
 const generateId = () => `group_${Math.random().toString(36).substring(2, 11)}`
 
@@ -54,23 +55,82 @@ export const useVariantsStore = create<VariantsState>((set, get) => ({
       configurableGroups: [...state.configurableGroups, newGroup],
       activeGroupId: id
     }))
+
+    // Add to history
+    useHistoryStore.getState().pushAction({
+      description: 'Varyasyon grubu oluşturuldu',
+      undo: () => {
+        set(state => ({
+          configurableGroups: state.configurableGroups.filter(g => g.id !== id),
+          activeGroupId: state.activeGroupId === id ? null : state.activeGroupId
+        }))
+      },
+      redo: () => {
+        set(state => ({
+          configurableGroups: [...state.configurableGroups, newGroup],
+          activeGroupId: id
+        }))
+      }
+    })
     
     return id
   },
 
   updateGroup: (id, updates) => {
+    const oldGroup = get().configurableGroups.find(g => g.id === id)
+    if (!oldGroup) return
+
     set(state => ({
       configurableGroups: state.configurableGroups.map(group =>
         group.id === id ? { ...group, ...updates } : group
       )
     }))
+
+    // Add to history
+    useHistoryStore.getState().pushAction({
+      description: 'Varyasyon grubu güncellendi',
+      undo: () => {
+        set(state => ({
+          configurableGroups: state.configurableGroups.map(group =>
+            group.id === id ? oldGroup : group
+          )
+        }))
+      },
+      redo: () => {
+        set(state => ({
+          configurableGroups: state.configurableGroups.map(group =>
+            group.id === id ? { ...group, ...updates } : group
+          )
+        }))
+      }
+    })
   },
 
   removeGroup: (id) => {
+    const groupToRemove = get().configurableGroups.find(g => g.id === id)
+    if (!groupToRemove) return
+
     set(state => ({
       configurableGroups: state.configurableGroups.filter(g => g.id !== id),
       activeGroupId: state.activeGroupId === id ? null : state.activeGroupId
     }))
+
+    // Add to history
+    useHistoryStore.getState().pushAction({
+      description: 'Varyasyon grubu silindi',
+      undo: () => {
+        set(state => ({
+          configurableGroups: [...state.configurableGroups, groupToRemove],
+          activeGroupId: id
+        }))
+      },
+      redo: () => {
+        set(state => ({
+          configurableGroups: state.configurableGroups.filter(g => g.id !== id),
+          activeGroupId: state.activeGroupId === id ? null : state.activeGroupId
+        }))
+      }
+    })
   },
 
   setActiveGroup: (id) => {
@@ -86,9 +146,36 @@ export const useVariantsStore = create<VariantsState>((set, get) => ({
           : group
       )
     }))
+
+    // Add to history
+    useHistoryStore.getState().pushAction({
+      description: 'Varyasyon seçeneği eklendi',
+      undo: () => {
+        set(state => ({
+          configurableGroups: state.configurableGroups.map(group =>
+            group.id === groupId
+              ? { ...group, options: group.options.filter(o => o !== option) }
+              : group
+          )
+        }))
+      },
+      redo: () => {
+        set(state => ({
+          configurableGroups: state.configurableGroups.map(group =>
+            group.id === groupId
+              ? { ...group, options: [...group.options, option] }
+              : group
+          )
+        }))
+      }
+    })
   },
 
   updateOption: (groupId, optionIndex, updates) => {
+    const group = get().configurableGroups.find(g => g.id === groupId)
+    if (!group) return
+    const oldOption = group.options[optionIndex]
+
     set(state => ({
       configurableGroups: state.configurableGroups.map(group =>
         group.id === groupId
@@ -101,6 +188,39 @@ export const useVariantsStore = create<VariantsState>((set, get) => ({
           : group
       )
     }))
+
+    // Add to history
+    useHistoryStore.getState().pushAction({
+      description: 'Varyasyon seçeneği güncellendi',
+      undo: () => {
+        set(state => ({
+          configurableGroups: state.configurableGroups.map(group =>
+            group.id === groupId
+              ? {
+                  ...group,
+                  options: group.options.map((opt, idx) =>
+                    idx === optionIndex ? oldOption : opt
+                  )
+                }
+              : group
+          )
+        }))
+      },
+      redo: () => {
+        set(state => ({
+          configurableGroups: state.configurableGroups.map(group =>
+            group.id === groupId
+              ? {
+                  ...group,
+                  options: group.options.map((opt, idx) =>
+                    idx === optionIndex ? { ...opt, ...updates } : opt
+                  )
+                }
+              : group
+          )
+        }))
+      }
+    })
   },
 
   removeOption: (groupId, optionIndex) => {

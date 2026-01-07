@@ -1,6 +1,8 @@
 // Type Definitions for the Project
 // Based on Project.md specifications
 
+import { HotspotNode, HotspotSettings } from '@/store/useHotspotStore'
+
 // ============ MODEL CONFIG ============
 export interface ModelConfig {
   id: string
@@ -10,6 +12,12 @@ export interface ModelConfig {
   rotation: [number, number, number]
   scale: [number, number, number]
   visible: boolean
+  // Store transforms for individual meshes inside the model
+  meshTransforms?: Record<string, {
+    position?: [number, number, number]
+    rotation?: [number, number, number]
+    scale?: [number, number, number]
+  }>
 }
 
 // ============ PROJECT.JSON ============
@@ -24,6 +32,12 @@ export interface ProjectConfig {
     envMap: string | null
     models: ModelConfig[] // Multiple model support
   }
+}
+
+// ============ HOTSPOTS.JSON ============
+export interface HotspotsConfig {
+  nodes: HotspotNode[]
+  settings: HotspotSettings
 }
 
 // ============ SCENE.JSON ============
@@ -161,6 +175,7 @@ export interface SceneConfig {
   player: PlayerConfig
   camera?: CameraConfig // Orbit view başlangıç kamerası
   effects?: EffectsConfig
+  deletedMeshIds?: string[] // Silinen mesh ID'leri
 }
 
 // ============ INTERACTIONS.JSON ============
@@ -225,7 +240,7 @@ export interface InteractionZone {
   id: string
   position: [number, number, number]
   radius: number
-  triggerType: 'proximity' | 'click'
+  triggerType: 'proximity', // 'click' removed as per request
   popup: PopupContent
 }
 
@@ -239,6 +254,8 @@ export interface VariantOption {
   type: 'color' | 'texture'
   value?: string // For color type
   textureUrl?: string // For texture type
+  normalMapUrl?: string // For normal map
+  roughnessMapUrl?: string // For roughness map
   tiling?: [number, number]
   metalness?: number // For metallic materials (0-1)
   roughness?: number // For material roughness (0-1)
@@ -264,6 +281,7 @@ export interface FullProjectData {
   scene: SceneConfig
   interactions: InteractionsConfig
   variants: VariantsConfig
+  hotspots: HotspotsConfig
 }
 
 // ============ DEFAULT VALUES ============
@@ -281,6 +299,7 @@ export const defaultProjectConfig: ProjectConfig = {
 }
 
 export const defaultSceneConfig: SceneConfig = {
+  deletedMeshIds: [],
   environment: {
     hdri: null,
     hdriPreset: 'apartment',
@@ -318,7 +337,7 @@ export const defaultSceneConfig: SceneConfig = {
   camera: {
     position: [5, 5, 5],
     target: [0, 0, 0],
-    fov: 50
+    fov: 75
   },
   effects: defaultEffectsConfig
 }
@@ -331,6 +350,20 @@ export const defaultVariantsConfig: VariantsConfig = {
   configurableGroups: []
 }
 
+export const defaultHotspotsConfig: HotspotsConfig = {
+  nodes: [],
+  settings: {
+    cursorColor: '#ffffff',
+    cursorSize: 1,
+    cursorOpacity: 0.8,
+    defaultShape: 'circle',
+    animationDuration: 1.0,
+    nodeColor: '#3b82f6',
+    nodeHoverColor: '#60a5fa',
+    walkableMeshIds: []
+  }
+}
+
 export const createDefaultProject = (projectId: string, projectName: string): FullProjectData => ({
   project: {
     ...defaultProjectConfig,
@@ -339,5 +372,6 @@ export const createDefaultProject = (projectId: string, projectName: string): Fu
   },
   scene: defaultSceneConfig,
   interactions: defaultInteractionsConfig,
-  variants: defaultVariantsConfig
+  variants: defaultVariantsConfig,
+  hotspots: defaultHotspotsConfig
 })

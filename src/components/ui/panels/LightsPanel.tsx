@@ -357,14 +357,43 @@ export default function LightsPanel() {
             
             {environment.hdriPreset === 'custom' && (
               <div className="space-y-1">
-                <label className="text-xs text-gray-400">Özel HDRI URL</label>
-                <input
-                  type="text"
-                  value={environment.customHdriUrl || ''}
-                  onChange={(e) => updateEnvironment({ customHdriUrl: e.target.value })}
-                  placeholder="https://... veya /path/to/hdri.hdr"
-                  className="w-full bg-editor-bg border border-gray-600 rounded px-2 py-1.5 text-white text-sm focus:border-blue-400 focus:outline-none"
-                />
+                <label className="text-xs text-gray-400">Özel HDRI (.hdr / .exr / .jpg)</label>
+                <div className="flex gap-2">
+                    <input
+                    type="text"
+                    value={environment.customHdriUrl || ''}
+                    readOnly
+                    placeholder="Dosya seçin..."
+                    className="flex-1 bg-editor-bg border border-gray-600 rounded px-2 py-1.5 text-white text-sm focus:border-blue-400 focus:outline-none opacity-50 cursor-not-allowed"
+                    />
+                    <label className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white rounded px-3 py-1.5 text-xs flex items-center justify-center transition-colors">
+                        <span>Yükle</span>
+                        <input
+                            type="file"
+                            accept=".hdr,.exr,.jpg,.jpeg,.png"
+                            className="hidden"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) {
+                                    const url = URL.createObjectURL(file)
+                                    
+                                    // Store for export
+                                    const win = window as any
+                                    if (!win.__loadedTextures) win.__loadedTextures = new Map()
+                                    // Use a unique name for export
+                                    const fileName = `hdri_${Date.now()}_${file.name}`
+                                    win.__loadedTextures.set(fileName, file)
+                                    
+                                    // Map blob to filename for export reference
+                                    if (!win.__blobUrlToFileName) win.__blobUrlToFileName = new Map()
+                                    win.__blobUrlToFileName.set(url, `textures/${fileName}`)
+
+                                    updateEnvironment({ customHdriUrl: url })
+                                }
+                            }}
+                        />
+                    </label>
+                </div>
               </div>
             )}
             

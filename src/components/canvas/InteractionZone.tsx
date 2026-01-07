@@ -3,6 +3,7 @@ import { ThreeEvent } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { useInteractionsStore } from '@/store/useInteractionsStore'
+import { useHotspotStore } from '@/store/useHotspotStore'
 import { useEditorStore } from '@/store/useEditorStore'
 
 interface InteractionZoneProps {
@@ -10,6 +11,7 @@ interface InteractionZoneProps {
   position: [number, number, number]
   radius: number
   title: string
+  triggerType: 'proximity'
   isEditor?: boolean
   onTrigger?: () => void
 }
@@ -22,20 +24,21 @@ function InteractionZoneMesh({
   isEditor = false, 
   onTrigger: _onTrigger
 }: InteractionZoneProps) {
-  const meshRef = useRef<THREE.Mesh>(null)
+  const groupRef = useRef<THREE.Group>(null)
   const { selectObject, registerMesh, unregisterMesh } = useEditorStore()
   const { setActiveZone, activeZoneId } = useInteractionsStore()
+  const { isHotspotMode } = useHotspotStore()
   
   const isActive = activeZoneId === zoneId
 
   // Register/unregister zone in sceneMeshes for outliner
   useEffect(() => {
-    if (!isEditor || !meshRef.current) return
+    if (!isEditor || !groupRef.current) return
     
     registerMesh({
       id: zoneId,
       name: `Zone: ${title}`,
-      object: meshRef.current,
+      object: groupRef.current,
       visible: true,
       type: 'zone'
     })
@@ -56,37 +59,47 @@ function InteractionZoneMesh({
         side: THREE.DoubleSide
       })
     }
+    
     // In viewer/player mode, zones are invisible
     return new THREE.MeshBasicMaterial({
-      visible: false
+      visible: false,
+      transparent: true,
+      opacity: 0
     })
   }, [isEditor, isActive])
   
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
-    if (!isEditor) return
-    e.stopPropagation()
-    
-    if (meshRef.current) {
-      selectObject(meshRef.current, zoneId, `Zone: ${zoneId}`)
-      setActiveZone(zoneId)
+    // In Editor: Selection logic
+    if (isEditor) {
+        e.stopPropagation()
+        // Disable selection in hotspot mode
+        if (isHotspotMode) return
+        
+        if (groupRef.current) {
+        selectObject(groupRef.current, zoneId, `Zone: ${zoneId}`)
+        setActiveZone(zoneId)
+        }
+        return
     }
   }
+
+  // Hide if in hotspot mode
+  if (isEditor && isHotspotMode) return null
   
   return (
-    <group position={position}>
+    <group ref={groupRef} position={position} scale={[radius, radius, radius]}>
       {/* Zone sphere */}
       <mesh
-        ref={meshRef}
         onClick={handleClick}
         material={material}
       >
-        <sphereGeometry args={[radius, 24, 24]} />
+        <sphereGeometry args={[1, 24, 24]} />
       </mesh>
       
       {/* Wireframe outline */}
       {isEditor && (
         <mesh>
-          <sphereGeometry args={[radius, 16, 16]} />
+          <sphereGeometry args={[1, 16, 16]} />
           <meshBasicMaterial 
             color={isActive ? '#00ff00' : '#3b82f6'} 
             wireframe 
@@ -147,6 +160,7 @@ export default function InteractionZonesManager({
           position={zone.position}
           radius={zone.radius}
           title={zone.popup.title}
+          triggerType={zone.triggerType}
           isEditor={isEditor}
         />
       ))}

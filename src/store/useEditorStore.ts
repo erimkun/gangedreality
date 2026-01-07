@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import * as THREE from 'three'
+import { useSceneStore } from './useSceneStore'
 
 // Debug logger
 const DEBUG = false
@@ -43,7 +44,7 @@ interface EditorState {
   // UI State
   isPropertiesPanelOpen: boolean
   isOutlinerOpen: boolean
-  activePanel: 'properties' | 'lights' | 'player' | 'interactions' | 'variants' | 'effects' | 'outliner' | null
+  activePanel: 'properties' | 'lights' | 'player' | 'interactions' | 'variants' | 'effects' | 'hotspots' | 'outliner' | null
   
   // Focus target for camera
   focusTarget: THREE.Vector3 | null
@@ -59,11 +60,15 @@ interface EditorState {
   
   // Mesh registry actions
   registerMesh: (mesh: MeshInfo) => void
+  registerMeshes: (meshes: MeshInfo[]) => void
   unregisterMesh: (id: string) => void
   clearMeshRegistry: () => void
   toggleMeshVisibility: (id: string) => void
   setMeshVisibility: (id: string, visible: boolean) => void
   
+  // Object Management
+  deleteObject: (id: string) => void
+
   // Focus
   focusOnSelection: () => void
   setFocusTarget: (target: THREE.Vector3 | null) => void
@@ -213,6 +218,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })
   },
 
+  registerMeshes: (meshes) => {
+    log('registerMeshes', { count: meshes.length })
+    set(state => {
+      // Filter out existing meshes that are being re-registered
+      const newIds = new Set(meshes.map(m => m.id))
+      const existingMeshes = state.sceneMeshes.filter(m => !newIds.has(m.id))
+      return { sceneMeshes: [...existingMeshes, ...meshes] }
+    })
+  },
+
   unregisterMesh: (id) => {
     log('unregisterMesh', { id })
     set(state => ({
@@ -259,17 +274,100 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
+  deleteObject: (id) => {
+    const state = get()
+    const meshInfo = state.sceneMeshes.find(m => m.id === id)
+    
+    if (meshInfo && meshInfo.object) {
+      log('deleteObject', { id, name: meshInfo.name })
+      
+      // Remove from parent
+      if (meshInfo.object.parent) {
+        meshInfo.object.parent.remove(meshInfo.object)
+      }
+      
+      // Dispose resources
+      if (meshInfo.object instanceof THREE.Mesh) {
+        if (meshInfo.object.geometry) {
+          meshInfo.object.geometry.dispose()
+        }
+        if (meshInfo.object.material) {
+          if (Array.isArray(meshInfo.object.material)) {
+            meshInfo.object.material.forEach((m: any) => m.dispose())
+          } else {
+            (meshInfo.object.material as any).dispose()
+          }
+        }
+      }
+      
+      // Update selection if needed
+      if (state.selectedObjectIds.includes(id)) {
+        const newSelectedIds = state.selectedObjectIds.filter(sid => sid !== id)
+        const newSelectedObjects = state.selectedObjects.filter(obj => obj.uuid !== id)
+        const newSelectedNames = state.selectedMeshNames.filter((_, idx) => state.selectedObjectIds[idx] !== id)
+        
+        set({
+          selectedObjectIds: newSelectedIds,
+          selectedObjects: newSelectedObjects,
+          selectedMeshNames: newSelectedNames,
+          // Update legacy single selection if needed
+          selectedObject: newSelectedObjects.length > 0 ? newSelectedObjects[newSelectedObjects.length - 1] : null,
+          selectedObjectId: newSelectedIds.length > 0 ? newSelectedIds[newSelectedIds.length - 1] : null,
+          selectedMeshName: newSelectedNames.length > 0 ? newSelectedNames[newSelectedNames.length - 1] : null
+        })
+      }
+      
+      // Remove from registry
+      get().unregisterMesh(id)
+
+      // Add to deleted meshes in SceneStore (for persistence)
+      // Use name if available for persistence across reloads, fall back to ID
+      useSceneStore.getState().addDeletedMesh(meshInfo.name || id)
+    }
+  },
+
   // Focus
   focusOnSelection: () => {
     const state = get()
     if (state.selectedObjects.length > 0) {
-      // Calculate center of all selected objects
-      const center = new THREE.Vector3()
+      // Calculate world bounding box center of all selected objects
+      const box = new THREE.Box3()
+      const objectBox = new THREE.Box3()
+      
       state.selectedObjects.forEach(obj => {
-        center.add(obj.position)
+        // Ensure manual update of world matrix for accuracy
+        obj.updateMatrixWorld()
+        
+        // If object has geometry, use it
+        if ((obj as THREE.Mesh).geometry) {
+           objectBox.setFromObject(obj)
+        } else {
+           // Fallback for lights/groups without geometry
+           const worldPos = new THREE.Vector3()
+           obj.getWorldPosition(worldPos)
+           objectBox.setFromCenterAndSize(worldPos, new THREE.Vector3(1,1,1))
+        }
+        
+        if (!objectBox.isEmpty()) {
+            box.union(objectBox)
+        }
       })
-      center.divideScalar(state.selectedObjects.length)
-      set({ focusTarget: center })
+      
+      if (!box.isEmpty()) {
+          const center = new THREE.Vector3()
+          box.getCenter(center)
+          set({ focusTarget: center })
+      } else {
+          // Fallback to average position if bounding box fails
+          const center = new THREE.Vector3()
+          state.selectedObjects.forEach(obj => {
+             const worldPos = new THREE.Vector3()
+             obj.getWorldPosition(worldPos)
+             center.add(worldPos)
+          })
+          center.divideScalar(state.selectedObjects.length)
+          set({ focusTarget: center })
+      }
     }
   },
 

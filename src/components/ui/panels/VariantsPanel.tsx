@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import { useVariantsStore } from '../../../store/useVariantsStore'
 import { useEditorStore } from '../../../store/useEditorStore'
+import { useToastStore } from '../../../store/useToastStore'
 import { EmptyState } from './shared'
 
 // ============================================
@@ -85,12 +86,36 @@ export default function VariantsPanel() {
   const [newName, setNewName] = useState('')
   const [textureFile, setTextureFile] = useState<File | null>(null)
   const [texturePreview, setTexturePreview] = useState<string | null>(null)
+  const [normalMapFile, setNormalMapFile] = useState<File | null>(null)
+  const [normalMapPreview, setNormalMapPreview] = useState<string | null>(null)
+  const [roughnessMapFile, setRoughnessMapFile] = useState<File | null>(null)
+  const [roughnessMapPreview, setRoughnessMapPreview] = useState<string | null>(null)
+  const [metalness, setMetalness] = useState(0)
+  const [roughness, setRoughness] = useState(1)
+  const [tilingX, setTilingX] = useState(1)
+  const [tilingY, setTilingY] = useState(1)
   const [preAssets, setPreAssets] = useState<PreAssetMaterial[]>([])
   const [showPreAssets, setShowPreAssets] = useState(false)
   const [preAssetFilter, setPreAssetFilter] = useState<string>('')
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
   const [editGroupName, setEditGroupName] = useState('')
   const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<string | null>(null)
+  
+  const { addToast } = useToastStore()
+  
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean
+    type: 'group' | 'option'
+    groupId: string
+    optionIndex?: number
+    name: string
+  }>({
+    isOpen: false,
+    type: 'group',
+    groupId: '',
+    name: ''
+  })
   
   // Load pre-assets on mount
   useEffect(() => {
@@ -134,21 +159,67 @@ export default function VariantsPanel() {
     }
   }
 
+  const handleNormalMapSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setNormalMapFile(file)
+      const preview = URL.createObjectURL(file)
+      setNormalMapPreview(preview)
+    }
+  }
+
+  const handleRoughnessMapSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setRoughnessMapFile(file)
+      const preview = URL.createObjectURL(file)
+      setRoughnessMapPreview(preview)
+    }
+  }
+
   const handleAddTexture = (groupId: string) => {
     if (newName.trim() && textureFile && texturePreview) {
-      // Store texture file for later export
-      const win = window as Window & { __loadedTextures?: Map<string, File> }
-      if (!win.__loadedTextures) {
-        win.__loadedTextures = new Map()
+      // Store texture files for later export
+      const win = window as Window & { 
+        __loadedTextures?: Map<string, File>
+        __blobUrlToFileName?: Map<string, string> 
       }
-      const textureFileName = `variant_${Date.now()}_${textureFile.name}`
+      
+      if (!win.__loadedTextures) win.__loadedTextures = new Map()
+      if (!win.__blobUrlToFileName) win.__blobUrlToFileName = new Map()
+      
+      const timestamp = Date.now()
+      
+      // 1. Main Texture
+      const textureFileName = `variant_${timestamp}_diff_${textureFile.name}`
       win.__loadedTextures.set(textureFileName, textureFile)
+      win.__blobUrlToFileName.set(texturePreview, `textures/${textureFileName}`)
+      
+      let normalMapUrl: string | undefined
+      if (normalMapFile && normalMapPreview) {
+        const normalFileName = `variant_${timestamp}_norm_${normalMapFile.name}`
+        win.__loadedTextures.set(normalFileName, normalMapFile)
+        win.__blobUrlToFileName.set(normalMapPreview, `textures/${normalFileName}`)
+        normalMapUrl = normalMapPreview
+      }
+
+      let roughnessMapUrl: string | undefined
+      if (roughnessMapFile && roughnessMapPreview) {
+        const roughFileName = `variant_${timestamp}_rough_${roughnessMapFile.name}`
+        win.__loadedTextures.set(roughFileName, roughnessMapFile)
+        win.__blobUrlToFileName.set(roughnessMapPreview, `textures/${roughFileName}`)
+        roughnessMapUrl = roughnessMapPreview
+      }
       
       addOption(groupId, {
         name: newName.trim(),
         type: 'texture',
         textureUrl: texturePreview,
-        tiling: [1, 1]
+        normalMapUrl,
+        roughnessMapUrl,
+        metalness,
+        roughness,
+        tiling: [tilingX, tilingY]
       })
       resetAddForm()
     }
@@ -181,10 +252,22 @@ export default function VariantsPanel() {
     setNewName('')
     setNewColor('#ffffff')
     setTextureFile(null)
-    if (texturePreview) {
-      URL.revokeObjectURL(texturePreview)
-    }
+    if (texturePreview) URL.revokeObjectURL(texturePreview)
     setTexturePreview(null)
+    
+    setNormalMapFile(null)
+    if (normalMapPreview) URL.revokeObjectURL(normalMapPreview)
+    setNormalMapPreview(null)
+
+    setRoughnessMapFile(null)
+    if (roughnessMapPreview) URL.revokeObjectURL(roughnessMapPreview)
+    setRoughnessMapPreview(null)
+
+    setMetalness(0)
+    setRoughness(1)
+    setTilingX(1)
+    setTilingY(1)
+
     setShowPreAssets(false)
     setPreAssetFilter('')
     setSelectedMaterialCategory(null)
@@ -208,10 +291,13 @@ export default function VariantsPanel() {
     setEditGroupName('')
   }
 
-  const handleDeleteGroup = (groupId: string) => {
-    if (confirm('Bu varyant grubunu silmek istediğinize emin misiniz?')) {
-      removeGroup(groupId)
-    }
+  const handleDeleteGroup = (groupId: string, groupName: string) => {
+    setDeleteConfirm({
+      isOpen: true,
+      type: 'group',
+      groupId,
+      name: groupName
+    })
   }
 
   const handleRemoveMesh = (groupId: string, meshName: string) => {
@@ -223,10 +309,25 @@ export default function VariantsPanel() {
     meshNames.forEach(name => addMeshToGroup(groupId, name))
   }
 
-  const handleDeleteOption = (groupId: string, optionIndex: number) => {
-    if (confirm('Bu seçeneği silmek istediğinize emin misiniz?')) {
-      removeOption(groupId, optionIndex)
+  const handleDeleteOption = (groupId: string, optionIndex: number, optionName: string) => {
+    setDeleteConfirm({
+      isOpen: true,
+      type: 'option',
+      groupId,
+      optionIndex,
+      name: optionName
+    })
+  }
+
+  const handleConfirmDelete = () => {
+    if (deleteConfirm.type === 'group') {
+      removeGroup(deleteConfirm.groupId)
+      addToast(`${deleteConfirm.name} grubu silindi`, 'success')
+    } else if (deleteConfirm.type === 'option' && deleteConfirm.optionIndex !== undefined) {
+      removeOption(deleteConfirm.groupId, deleteConfirm.optionIndex)
+      addToast(`${deleteConfirm.name} seçeneği silindi`, 'success')
     }
+    setDeleteConfirm({ ...deleteConfirm, isOpen: false })
   }
 
   // Helper function to adjust color brightness for metallic effect
@@ -275,7 +376,7 @@ export default function VariantsPanel() {
                   ✏️
                 </button>
                 <button
-                  onClick={() => handleDeleteGroup(group.id)}
+                  onClick={() => handleDeleteGroup(group.id, group.displayName)}
                   className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
                   title="Sil"
                 >
@@ -311,7 +412,7 @@ export default function VariantsPanel() {
                   option={option}
                   isSelected={group.selectedOptionIndex === idx}
                   onSelect={() => selectOption(group.id, idx)}
-                  onDelete={() => handleDeleteOption(group.id, idx)}
+                  onDelete={() => handleDeleteOption(group.id, idx, option.name)}
                   adjustBrightness={adjustBrightness}
                 />
               ))}
@@ -336,6 +437,16 @@ export default function VariantsPanel() {
                 newColor={newColor}
                 setNewColor={setNewColor}
                 texturePreview={texturePreview}
+                normalMapPreview={normalMapPreview}
+                roughnessMapPreview={roughnessMapPreview}
+                metalness={metalness}
+                setMetalness={setMetalness}
+                roughness={roughness}
+                setRoughness={setRoughness}
+                tilingX={tilingX}
+                setTilingX={setTilingX}
+                tilingY={tilingY}
+                setTilingY={setTilingY}
                 showPreAssets={showPreAssets}
                 setShowPreAssets={setShowPreAssets}
                 preAssetFilter={preAssetFilter}
@@ -344,6 +455,8 @@ export default function VariantsPanel() {
                 selectedMaterialCategory={selectedMaterialCategory}
                 setSelectedMaterialCategory={setSelectedMaterialCategory}
                 handleTextureSelect={handleTextureSelect}
+                handleNormalMapSelect={handleNormalMapSelect}
+                handleRoughnessMapSelect={handleRoughnessMapSelect}
                 handleAddColor={handleAddColor}
                 handleAddTexture={handleAddTexture}
                 handleAddPreAsset={handleAddPreAsset}
@@ -354,6 +467,34 @@ export default function VariantsPanel() {
           </div>
         ))}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.isOpen && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1A1F22] border border-white/10 rounded-xl p-4 w-full shadow-2xl">
+            <h3 className="text-white font-medium mb-2">
+              {deleteConfirm.type === 'group' ? 'Grubu Sil?' : 'Seçeneği Sil?'}
+            </h3>
+            <p className="text-white/60 text-sm mb-4">
+              <span className="text-white font-medium">{deleteConfirm.name}</span> kalıcı olarak silinecek.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirm({ ...deleteConfirm, isOpen: false })}
+                className="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/70 hover:text-white text-sm transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-sm transition-colors font-medium"
+              >
+                Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -503,6 +644,16 @@ interface AddOptionPanelProps {
   newColor: string
   setNewColor: (color: string) => void
   texturePreview: string | null
+  normalMapPreview: string | null
+  roughnessMapPreview: string | null
+  metalness: number
+  setMetalness: (val: number) => void
+  roughness: number
+  setRoughness: (val: number) => void
+  tilingX: number
+  setTilingX: (val: number) => void
+  tilingY: number
+  setTilingY: (val: number) => void
   showPreAssets: boolean
   setShowPreAssets: (show: boolean) => void
   preAssetFilter: string
@@ -511,6 +662,8 @@ interface AddOptionPanelProps {
   selectedMaterialCategory: string | null
   setSelectedMaterialCategory: (category: string | null) => void
   handleTextureSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  handleNormalMapSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  handleRoughnessMapSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
   handleAddColor: (groupId: string) => void
   handleAddTexture: (groupId: string) => void
   handleAddPreAsset: (groupId: string, asset: PreAssetMaterial) => void
@@ -527,6 +680,16 @@ function AddOptionPanel({
   newColor,
   setNewColor,
   texturePreview,
+  normalMapPreview,
+  roughnessMapPreview,
+  metalness,
+  setMetalness,
+  roughness,
+  setRoughness,
+  tilingX,
+  setTilingX,
+  tilingY,
+  setTilingY,
   showPreAssets,
   setShowPreAssets,
   preAssetFilter,
@@ -535,6 +698,8 @@ function AddOptionPanel({
   selectedMaterialCategory,
   setSelectedMaterialCategory,
   handleTextureSelect,
+  handleNormalMapSelect,
+  handleRoughnessMapSelect,
   handleAddColor,
   handleAddTexture,
   handleAddPreAsset,
@@ -586,6 +751,16 @@ function AddOptionPanel({
           newName={newName}
           setNewName={setNewName}
           texturePreview={texturePreview}
+          normalMapPreview={normalMapPreview}
+          roughnessMapPreview={roughnessMapPreview}
+          metalness={metalness}
+          setMetalness={setMetalness}
+          roughness={roughness}
+          setRoughness={setRoughness}
+          tilingX={tilingX}
+          setTilingX={setTilingX}
+          tilingY={tilingY}
+          setTilingY={setTilingY}
           showPreAssets={showPreAssets}
           setShowPreAssets={setShowPreAssets}
           preAssetFilter={preAssetFilter}
@@ -595,6 +770,8 @@ function AddOptionPanel({
           setSelectedMaterialCategory={setSelectedMaterialCategory}
           groupId={groupId}
           handleTextureSelect={handleTextureSelect}
+          handleNormalMapSelect={handleNormalMapSelect}
+          handleRoughnessMapSelect={handleRoughnessMapSelect}
           handleAddTexture={handleAddTexture}
           handleAddPreAsset={handleAddPreAsset}
           handleAddBuiltInMaterial={handleAddBuiltInMaterial}
@@ -662,6 +839,16 @@ interface TextureAddFormProps {
   newName: string
   setNewName: (name: string) => void
   texturePreview: string | null
+  normalMapPreview: string | null
+  roughnessMapPreview: string | null
+  metalness: number
+  setMetalness: (val: number) => void
+  roughness: number
+  setRoughness: (val: number) => void
+  tilingX: number
+  setTilingX: (val: number) => void
+  tilingY: number
+  setTilingY: (val: number) => void
   showPreAssets: boolean
   setShowPreAssets: (show: boolean) => void
   preAssetFilter: string
@@ -671,6 +858,8 @@ interface TextureAddFormProps {
   setSelectedMaterialCategory: (category: string | null) => void
   groupId: string
   handleTextureSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  handleNormalMapSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  handleRoughnessMapSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
   handleAddTexture: (groupId: string) => void
   handleAddPreAsset: (groupId: string, asset: PreAssetMaterial) => void
   handleAddBuiltInMaterial: (groupId: string, material: BuiltInMaterial) => void
@@ -682,6 +871,16 @@ function TextureAddForm({
   newName,
   setNewName,
   texturePreview,
+  normalMapPreview,
+  roughnessMapPreview,
+  metalness,
+  setMetalness,
+  roughness,
+  setRoughness,
+  tilingX,
+  setTilingX,
+  tilingY,
+  setTilingY,
   showPreAssets,
   setShowPreAssets,
   preAssetFilter,
@@ -691,6 +890,8 @@ function TextureAddForm({
   setSelectedMaterialCategory,
   groupId,
   handleTextureSelect,
+  handleNormalMapSelect,
+  handleRoughnessMapSelect,
   handleAddTexture,
   handleAddPreAsset,
   handleAddBuiltInMaterial,
@@ -748,9 +949,85 @@ function TextureAddForm({
             {texturePreview ? (
               <img src={texturePreview} alt="Preview" className="w-16 h-16 object-cover rounded" />
             ) : (
-              <span className="text-gray-400 text-sm">📁 Doku Seç</span>
+              <span className="text-gray-400 text-sm">📁 Ana Doku (Color)</span>
             )}
           </label>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col items-center justify-center gap-1 py-3 border border-dashed border-gray-600 hover:border-purple-400 rounded-lg cursor-pointer transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleNormalMapSelect}
+                className="hidden"
+              />
+              {normalMapPreview ? (
+                <img src={normalMapPreview} alt="Normal" className="w-8 h-8 object-cover rounded" />
+              ) : (
+                <span className="text-gray-400 text-xs">Normal Map</span>
+              )}
+            </label>
+
+            <label className="flex flex-col items-center justify-center gap-1 py-3 border border-dashed border-gray-600 hover:border-purple-400 rounded-lg cursor-pointer transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleRoughnessMapSelect}
+                className="hidden"
+              />
+              {roughnessMapPreview ? (
+                <img src={roughnessMapPreview} alt="Roughness" className="w-8 h-8 object-cover rounded" />
+              ) : (
+                <span className="text-gray-400 text-xs">Roughness Map</span>
+              )}
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Metalik ({metalness})</label>
+              <input 
+                type="range" 
+                min="0" max="1" step="0.1"
+                value={metalness}
+                onChange={(e) => setMetalness(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Pürüzlülük ({roughness})</label>
+              <input 
+                type="range" 
+                min="0" max="1" step="0.1"
+                value={roughness}
+                onChange={(e) => setRoughness(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Döşeme X ({tilingX})</label>
+              <input 
+                type="number" 
+                min="0.1" step="0.1"
+                value={tilingX}
+                onChange={(e) => setTilingX(parseFloat(e.target.value))}
+                className="w-full bg-editor-bg border border-gray-600 rounded px-2 py-1 text-white text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Döşeme Y ({tilingY})</label>
+              <input 
+                type="number" 
+                min="0.1" step="0.1"
+                value={tilingY}
+                onChange={(e) => setTilingY(parseFloat(e.target.value))}
+                className="w-full bg-editor-bg border border-gray-600 rounded px-2 py-1 text-white text-xs"
+              />
+            </div>
+          </div>
           
           <div className="flex gap-2">
             <button

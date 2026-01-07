@@ -4,7 +4,10 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useEditorStore } from '@/store/useEditorStore'
+import { useSceneStore } from '@/store/useSceneStore'
 import { useVariantsStore } from '@/store/useVariantsStore'
+import { useHotspotStore } from '@/store/useHotspotStore'
+import { ModelConfig } from '@/types'
 
 // Debug logger utility
 const DEBUG = true
@@ -21,7 +24,16 @@ interface ModelRendererProps {
 // Default Box when no model is loaded
 function DefaultScene({ isEditor }: { isEditor?: boolean }) {
   const meshRef = useRef<THREE.Mesh>(null)
-  const { selectObject, registerMesh, clearMeshRegistry } = useEditorStore()
+  const selectObject = useEditorStore(state => state.selectObject)
+  const registerMesh = useEditorStore(state => state.registerMesh)
+  const clearMeshRegistry = useEditorStore(state => state.clearMeshRegistry)
+  
+  // Track pointer down position
+  const pointerDownPos = useRef({ x: 0, y: 0 })
+
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    pointerDownPos.current = { x: e.clientX, y: e.clientY }
+  }
   
   // Register default scene meshes
   useEffect(() => {
@@ -44,8 +56,25 @@ function DefaultScene({ isEditor }: { isEditor?: boolean }) {
   }, [isEditor, registerMesh, clearMeshRegistry])
   
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    // Check drag distance
+    const dist = Math.sqrt(
+      Math.pow(e.clientX - pointerDownPos.current.x, 2) + 
+      Math.pow(e.clientY - pointerDownPos.current.y, 2)
+    )
+    
+    if (dist > 5) return
+
+    // Check global state directly to avoid closure staleness
+    const isHotspotMode = useHotspotStore.getState().isHotspotMode
+    
     if (isEditor && meshRef.current) {
       e.stopPropagation()
+      
+      if (isHotspotMode) {
+        log('DefaultScene', 'Hotspot mode active, ignoring click')
+        return
+      }
+
       log('DefaultScene', 'Box clicked, selecting')
       selectObject(meshRef.current, 'default-box', 'DefaultBox')
     }
@@ -68,6 +97,7 @@ function DefaultScene({ isEditor }: { isEditor?: boolean }) {
         ref={meshRef}
         position={[0, 1, 0]} 
         castShadow
+        onPointerDown={handlePointerDown}
         onClick={handleClick}
       >
         <boxGeometry args={[2, 2, 2]} />
@@ -89,15 +119,7 @@ function LoadedModel({
   config, 
   isEditor 
 }: { 
-  config: { 
-    id: string
-    url: string
-    name: string
-    position: [number, number, number]
-    rotation: [number, number, number]
-    scale: [number, number, number]
-    visible: boolean
-  }
+  config: ModelConfig
   isEditor?: boolean 
 }) {
   const gltf = useGLTF(config.url)
@@ -120,10 +142,63 @@ function LoadedModel({
     
     return cloned
   }, [gltf.scene])
-  const { selectObject, registerMesh, unregisterMesh } = useEditorStore()
+  
+  const selectObject = useEditorStore(state => state.selectObject)
+  const registerMeshes = useEditorStore(state => state.registerMeshes)
+  const unregisterMesh = useEditorStore(state => state.unregisterMesh)
+  
   const { configurableGroups } = useVariantsStore()
+  const { isHotspotMode, settings } = useHotspotStore()
+  const deletedMeshIds = useSceneStore(state => state.deletedMeshIds)
+  
+  // Track pointer down position to distinguish clicks from drags
+  const pointerDownPos = useRef({ x: 0, y: 0 })
+
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    pointerDownPos.current = { x: e.clientX, y: e.clientY }
+  }
   
   log('LoadedModel', 'Component mounted with URL:', config.url)
+  
+  // Hotspot Mode Isolation Logic
+  useEffect(() => {
+    if (!isEditor) return
+
+    // User requested NOT to hide everything, just specific things.
+    // So we disable this aggressive isolation logic for now.
+    // If we want to re-enable "only show walkable", we can uncomment this.
+    
+    /*
+    const walkableIds = settings.walkableMeshIds || []
+    
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        if (isHotspotMode) {
+          // Isolation Mode: Only show walkable meshes
+          const isWalkable = walkableIds.includes(child.name) || walkableIds.includes(child.uuid)
+          
+          if (isWalkable) {
+            child.visible = true
+          } else {
+            child.visible = false
+          }
+        } else {
+          // Normal Mode: Restore visibility
+          child.visible = true
+        }
+      }
+    })
+    */
+   
+   // Ensure everything is visible when mode changes (cleanup)
+   if (!isHotspotMode) {
+     scene.traverse((child) => {
+       if (child instanceof THREE.Mesh) {
+         child.visible = true
+       }
+     })
+   }
+  }, [isHotspotMode, settings.walkableMeshIds, scene, isEditor])
   
   useEffect(() => {
     log('LoadedModel', 'Scene loaded, processing...', { 
@@ -134,17 +209,28 @@ function LoadedModel({
     let meshCount = 0
     let groupCount = 0
     const registeredIds: string[] = []
+    const meshesToRegister: any[] = []
     
     // Setup shadows and materials, register meshes from ORIGINAL scene
     scene.traverse((child: THREE.Object3D) => {
+      // Check if deleted
+      const isDeleted = deletedMeshIds?.includes(child.uuid) || (child.name && deletedMeshIds?.includes(child.name))
+      
+      if (isDeleted) {
+        child.visible = false
+      }
+
       if (child instanceof THREE.Mesh) {
+        // Skip if deleted
+        if (isDeleted) return
+
         child.castShadow = true
         child.receiveShadow = true
         meshCount++
         
         // Store original material for reset
         if (!child.userData.originalMaterial) {
-          child.userData.originalMaterial = child.material.clone()
+          child.userData.originalMaterial = child.material
         }
         
         // Register mesh for outliner (only in editor mode)
@@ -152,9 +238,9 @@ function LoadedModel({
           const meshId = child.uuid
           const meshName = child.name || `Mesh_${meshCount}`
           
-          log('LoadedModel', `Registering mesh: ${meshName}`, { id: meshId })
+          // log('LoadedModel', `Registering mesh: ${meshName}`, { id: meshId })
           
-          registerMesh({
+          meshesToRegister.push({
             id: meshId,
             name: meshName,
             object: child,
@@ -165,12 +251,16 @@ function LoadedModel({
           registeredIds.push(meshId)
         }
       } else if (child instanceof THREE.Group && child !== scene) {
+        // Skip if deleted
+        const isDeleted = deletedMeshIds?.includes(child.uuid) || (child.name && deletedMeshIds?.includes(child.name))
+        if (isDeleted) return
+
         groupCount++
         
         // Optionally register groups too
         if (isEditor && child.name) {
-          log('LoadedModel', `Registering group: ${child.name}`)
-          registerMesh({
+          // log('LoadedModel', `Registering group: ${child.name}`)
+          meshesToRegister.push({
             id: child.uuid,
             name: child.name,
             object: child,
@@ -182,6 +272,11 @@ function LoadedModel({
         }
       }
     })
+
+    if (isEditor && meshesToRegister.length > 0) {
+      log('LoadedModel', `Batch registering ${meshesToRegister.length} items`)
+      registerMeshes(meshesToRegister)
+    }
     
     log('LoadedModel', 'Scene processing complete', { meshCount, groupCount })
 
@@ -192,7 +287,7 @@ function LoadedModel({
       }
     }
     
-  }, [scene, isEditor, registerMesh, unregisterMesh, config.id])
+  }, [scene, isEditor, registerMeshes, unregisterMesh, config.id, deletedMeshIds])
   
   // Apply variant materials - Only in Viewer/Player mode, not in Editor
   useEffect(() => {
@@ -206,6 +301,10 @@ function LoadedModel({
       groupCount: configurableGroups.length 
     })
     
+    // Cache for created variant materials to share them across meshes
+    // Key format: `${groupId}-${optionIndex}-${originalMaterialUuid}`
+    const variantMaterialCache = new Map<string, THREE.Material>()
+
     configurableGroups.forEach(group => {
       // Skip if no option selected
       if (group.selectedOptionIndex === null || group.selectedOptionIndex < 0) return
@@ -215,44 +314,137 @@ function LoadedModel({
       
       scene.traverse((child: THREE.Object3D) => {
         if (child instanceof THREE.Mesh && group.targetMeshNames.includes(child.name)) {
-          log('LoadedModel', `Applying variant to mesh: ${child.name}`, selectedOption)
           
-          if (selectedOption.type === 'color' && selectedOption.value) {
-            if (child.material instanceof THREE.MeshStandardMaterial) {
-              child.material = child.material.clone()
-              child.material.color.set(selectedOption.value)
-              child.material.map = null // Remove texture if switching to color
-              child.material.needsUpdate = true
+          // Get original material (fallback to current if not saved yet)
+          const originalMat = child.userData.originalMaterial || child.material
+          
+          // Create unique key for this variant + base material combination
+          const cacheKey = `${group.id}-${group.selectedOptionIndex}-${originalMat.uuid}`
+          
+          if (variantMaterialCache.has(cacheKey)) {
+            // Use cached material
+            const cachedMat = variantMaterialCache.get(cacheKey)
+            if (child.material !== cachedMat) {
+              child.material = cachedMat!
+              // log('LoadedModel', `Applied cached material to ${child.name}`)
             }
-          } else if (selectedOption.type === 'texture' && selectedOption.textureUrl) {
-            // Load and apply texture
-            const textureLoader = new THREE.TextureLoader()
-            textureLoader.load(selectedOption.textureUrl, (texture) => {
-              // Apply tiling if specified
-              if (selectedOption.tiling) {
-                texture.wrapS = THREE.RepeatWrapping
-                texture.wrapT = THREE.RepeatWrapping
-                texture.repeat.set(selectedOption.tiling[0], selectedOption.tiling[1])
+          } else {
+            log('LoadedModel', `Creating new material for ${child.name}`, selectedOption)
+            
+            let newMat: THREE.Material
+
+            if (originalMat instanceof THREE.MeshStandardMaterial) {
+              newMat = originalMat.clone()
+              const stdMat = newMat as THREE.MeshStandardMaterial
+
+              if (selectedOption.type === 'color' && selectedOption.value) {
+                stdMat.color.set(selectedOption.value)
+                stdMat.map = null // Remove texture if switching to color
+                stdMat.needsUpdate = true
+              } else if (selectedOption.type === 'texture') {
+                const textureLoader = new THREE.TextureLoader()
+                
+                // Helper to apply tiling
+                const applyTiling = (tex: THREE.Texture) => {
+                  if (selectedOption.tiling) {
+                    tex.wrapS = THREE.RepeatWrapping
+                    tex.wrapT = THREE.RepeatWrapping
+                    tex.repeat.set(selectedOption.tiling![0], selectedOption.tiling![1])
+                  }
+                }
+
+                // 1. Load Albedo/Color Map
+                if (selectedOption.textureUrl) {
+                  textureLoader.load(selectedOption.textureUrl, (texture) => {
+                    applyTiling(texture)
+                    texture.colorSpace = THREE.SRGBColorSpace
+                    stdMat.map = texture
+                    stdMat.color.set('#ffffff') 
+                    stdMat.needsUpdate = true
+                    log('LoadedModel', `Texture loaded for ${child.name}`)
+                  }, undefined, (err) => console.error('Error loading texture', err))
+                }
+
+                // 2. Load Normal Map
+                if (selectedOption.normalMapUrl) {
+                  textureLoader.load(selectedOption.normalMapUrl, (normalMap) => {
+                    applyTiling(normalMap)
+                    stdMat.normalMap = normalMap
+                    stdMat.needsUpdate = true
+                    log('LoadedModel', `Normal map loaded for ${child.name}`)
+                  }, undefined, (err) => console.error('Error loading normal map', err))
+                }
+
+                // 3. Load Roughness Map
+                if (selectedOption.roughnessMapUrl) {
+                  textureLoader.load(selectedOption.roughnessMapUrl, (roughnessMap) => {
+                    applyTiling(roughnessMap)
+                    stdMat.roughnessMap = roughnessMap
+                    stdMat.needsUpdate = true
+                    log('LoadedModel', `Roughness map loaded for ${child.name}`)
+                  }, undefined, (err) => console.error('Error loading roughness map', err))
+                }
+
+                // Apply scalar values if present
+                if (selectedOption.metalness !== undefined) stdMat.metalness = selectedOption.metalness
+                if (selectedOption.roughness !== undefined) stdMat.roughness = selectedOption.roughness
               }
-              
-              if (child.material instanceof THREE.MeshStandardMaterial) {
-                child.material = child.material.clone()
-                child.material.map = texture
-                child.material.color.set('#ffffff') // Reset color to white so texture shows properly
-                child.material.needsUpdate = true
-                log('LoadedModel', `Texture applied to ${child.name}`)
-              }
-            }, undefined, (error) => {
-              log('LoadedModel', `Error loading texture for ${child.name}`, error)
-            })
+            } else {
+              // Fallback for non-standard materials (just clone for now)
+              newMat = originalMat.clone()
+            }
+            
+            // Cache and assign
+            variantMaterialCache.set(cacheKey, newMat)
+            child.material = newMat
           }
         }
       })
     })
   }, [configurableGroups, scene, isEditor])
+
+  // Apply mesh transforms from config (for both Editor and Viewer)
+  useEffect(() => {
+    if (!config.meshTransforms) return
+    
+    log('LoadedModel', 'Applying mesh transforms', { count: Object.keys(config.meshTransforms).length })
+    
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && config.meshTransforms?.[child.name]) {
+        const transform = config.meshTransforms[child.name]
+        
+        // Only apply if values exist
+        if (transform.position) child.position.fromArray(transform.position)
+        if (transform.rotation) child.rotation.fromArray(transform.rotation)
+        if (transform.scale) child.scale.fromArray(transform.scale)
+        
+        child.updateMatrix()
+      }
+    })
+  }, [config.meshTransforms, scene])
   
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
+
+    // Check drag distance to prevent selection after flying/orbiting
+    const dist = Math.sqrt(
+      Math.pow(e.clientX - pointerDownPos.current.x, 2) + 
+      Math.pow(e.clientY - pointerDownPos.current.y, 2)
+    )
+    
+    if (dist > 5) {
+      log('LoadedModel', 'Click ignored due to drag', { dist })
+      return
+    }
+    
+    // Check global state directly to avoid closure staleness
+    const isHotspotMode = useHotspotStore.getState().isHotspotMode
+    
+    // If in Hotspot Mode, DO NOT select the object.
+    // The click will be handled by HotspotRenderer's global click listener.
+    if (isEditor && isHotspotMode) {
+      return
+    }
     
     const clickedMesh = e.object as THREE.Mesh
     log('LoadedModel', 'Mesh clicked:', { 
@@ -262,7 +454,16 @@ function LoadedModel({
     })
     
     if (isEditor) {
-      selectObject(clickedMesh, clickedMesh.uuid, clickedMesh.name)
+      // Allow multi-selection with Shift or Ctrl keys
+      const isMultiSelect = e.shiftKey || e.ctrlKey || e.metaKey
+      
+      // Stop propagation to prevent selecting parent groups or other objects behind
+      e.stopPropagation()
+
+      // Directly select the clicked mesh
+      // We removed the logic that forces selecting the Model (root) first
+      // because users found it confusing and it prevented easy mesh selection.
+      selectObject(clickedMesh, clickedMesh.uuid, clickedMesh.name, isMultiSelect)
     } else {
       // In viewer mode, check if this mesh has a variant group
       const variantGroup = configurableGroups.find(g => 
@@ -274,6 +475,11 @@ function LoadedModel({
           detail: { groupId: variantGroup.id, meshName: clickedMesh.name }
         }))
         log('LoadedModel', 'Variant hotspot clicked', { groupId: variantGroup.id })
+      } else {
+        // If no variant, dispatch generic model click for teleportation (handled in ViewerContent)
+        window.dispatchEvent(new CustomEvent('model-click-teleport', {
+          detail: { point: e.point }
+        }))
       }
     }
   }
@@ -285,6 +491,7 @@ function LoadedModel({
       rotation={config.rotation}
       scale={config.scale}
       visible={config.visible}
+      onPointerDown={handlePointerDown}
       onClick={handleClick}
     />
   )

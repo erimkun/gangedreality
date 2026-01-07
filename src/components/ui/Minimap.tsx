@@ -104,13 +104,11 @@ export function MinimapCamera({
 
 // Canvas INSIDE - Only renders the scene to texture and sends image via callback
 export function MinimapRenderer({ 
-  playerPosition,
   viewRange = 50
 }: { 
-  playerPosition?: THREE.Vector3 | null
   viewRange?: number 
 }) {
-  const { scene, gl } = useThree()
+  const { scene, gl, camera: mainCamera } = useThree()
   
   const minimapCamera = useRef<THREE.OrthographicCamera | null>(null)
   const renderTarget = useRef<THREE.WebGLRenderTarget | null>(null)
@@ -155,9 +153,9 @@ export function MinimapRenderer({
     frameCount.current++
     if (frameCount.current % 6 !== 0) return // Render every 6 frames
     
-    // Position camera above player
-    const camX = playerPosition?.x || 0
-    const camZ = playerPosition?.z || 0
+    // Position camera above player (use main camera position)
+    const camX = mainCamera.position.x
+    const camZ = mainCamera.position.z
     minimapCamera.current.position.set(camX, 150, camZ)
     minimapCamera.current.lookAt(camX, 0, camZ)
     

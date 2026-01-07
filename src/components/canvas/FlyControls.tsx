@@ -4,7 +4,8 @@ import * as THREE from 'three'
 
 // Fly Controls Component - Left-click + WASD to fly
 export function FlyControls() {
-  const { camera, gl, controls } = useThree()
+  const controls = useThree((state) => state.controls)
+  const { camera, gl } = useThree()
   const isLeftMouseDown = useRef(false)
   const moveState = useRef({
     forward: false,

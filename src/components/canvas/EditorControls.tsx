@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { useEditorStore } from '@/store/useEditorStore'
 import { useSceneStore } from '@/store/useSceneStore'
 import { useInteractionsStore } from '@/store/useInteractionsStore'
+import { useProjectStore } from '@/store/useProjectStore'
 import { useHistoryStore } from '@/hooks/useHistory'
 
 // Debug logger
@@ -109,6 +110,7 @@ export default function EditorControls() {
     
     if (objId.startsWith('light_')) return 'light'
     if (objId.startsWith('zone_')) return 'zone'
+    if (objId.startsWith('model_') || objId === 'main-model') return 'model'
     return 'mesh'
   }, [])
 
@@ -154,6 +156,12 @@ export default function EditorControls() {
         updateLight(id, { position })
       } else if (objectType === 'zone') {
         updateZone(id, { position })
+      } else if (objectType === 'model') {
+        useProjectStore.getState().updateModel(id, {
+          position,
+          rotation: obj.rotation.toArray().slice(0, 3) as [number, number, number],
+          scale: obj.scale.toArray() as [number, number, number]
+        })
       }
     })
   }, [isMultiSelect, selectedObjects, selectedObjectIds, activeTool, getObjectType, updateLight, updateZone])
@@ -191,13 +199,48 @@ export default function EditorControls() {
         const scale = selectedObject.scale.x // Uniform scale = radius
         updateZone(selectedObjectId, { position, radius: scale })
         break
-      case 'mesh':
-        log('Mesh transform:', { 
-          id: selectedObjectId, 
+      case 'model':
+        useProjectStore.getState().updateModel(selectedObjectId, {
           position,
-          rotation: selectedObject.rotation.toArray().slice(0, 3),
-          scale: selectedObject.scale.toArray()
+          rotation: selectedObject.rotation.toArray().slice(0, 3) as [number, number, number],
+          scale: selectedObject.scale.toArray() as [number, number, number]
         })
+        break
+      case 'mesh':
+        // Find which model this mesh belongs to
+        const meshInfo = useEditorStore.getState().sceneMeshes.find(m => m.id === selectedObjectId)
+        if (meshInfo && meshInfo.parentId) {
+          const modelId = meshInfo.parentId
+          
+          // If it's the main model (legacy), we might need to find it in the models array if it was migrated, 
+          // or we might need to handle it specially if it's just a URL string.
+          // For now, let's assume all models are in the models array or we can update the main model config if it exists there.
+          
+          // Actually, updateModel works on ID. If ID is 'main-model', it should work if it's in the array.
+          // If it's NOT in the array (legacy mainModel string only), we can't easily store mesh transforms 
+          // unless we migrate it to the array.
+          // But ModelRenderer creates a fake model object for mainModel if the array is empty.
+          // So we should probably ensure mainModel is in the array if we want to support this.
+          // However, let's try to update it if found.
+          
+          const targetModel = useProjectStore.getState().assets.models.find(m => m.id === modelId)
+          
+          if (targetModel) {
+            const newTransforms = {
+              ...(targetModel.meshTransforms || {}),
+              [meshInfo.name]: {
+                position: selectedObject.position.toArray() as [number, number, number],
+                rotation: selectedObject.rotation.toArray().slice(0, 3) as [number, number, number],
+                scale: selectedObject.scale.toArray() as [number, number, number]
+              }
+            }
+            
+            useProjectStore.getState().updateModel(modelId, {
+              meshTransforms: newTransforms
+            })
+            log('Mesh transform saved to store:', { mesh: meshInfo.name, modelId })
+          }
+        }
         break
     }
   }, [selectedObject, selectedObjectId, getObjectType, updateLight, updateZone])
@@ -399,6 +442,29 @@ export default function EditorControls() {
                 updateLight(objectId, { position: pos })
               } else if (objectType === 'zone') {
                 updateZone(objectId, { position: pos, radius: preState.scale.x })
+              } else if (objectType === 'model') {
+                useProjectStore.getState().updateModel(objectId, {
+                  position: pos,
+                  rotation: preState.rotation.toArray().slice(0, 3) as [number, number, number],
+                  scale: preState.scale.toArray() as [number, number, number]
+                })
+              } else if (objectType === 'mesh') {
+                const meshInfo = useEditorStore.getState().sceneMeshes.find(m => m.id === objectId)
+                if (meshInfo && meshInfo.parentId) {
+                  const modelId = meshInfo.parentId
+                  const targetModel = useProjectStore.getState().assets.models.find(m => m.id === modelId)
+                  if (targetModel) {
+                    const newTransforms = {
+                      ...(targetModel.meshTransforms || {}),
+                      [meshInfo.name]: {
+                        position: pos,
+                        rotation: preState.rotation.toArray().slice(0, 3) as [number, number, number],
+                        scale: preState.scale.toArray() as [number, number, number]
+                      }
+                    }
+                    useProjectStore.getState().updateModel(modelId, { meshTransforms: newTransforms })
+                  }
+                }
               }
               log('Undo transform')
             },
@@ -413,6 +479,29 @@ export default function EditorControls() {
                 updateLight(objectId, { position: pos })
               } else if (objectType === 'zone') {
                 updateZone(objectId, { position: pos, radius: postScale.x })
+              } else if (objectType === 'model') {
+                useProjectStore.getState().updateModel(objectId, {
+                  position: pos,
+                  rotation: postRotation.toArray().slice(0, 3) as [number, number, number],
+                  scale: postScale.toArray() as [number, number, number]
+                })
+              } else if (objectType === 'mesh') {
+                const meshInfo = useEditorStore.getState().sceneMeshes.find(m => m.id === objectId)
+                if (meshInfo && meshInfo.parentId) {
+                  const modelId = meshInfo.parentId
+                  const targetModel = useProjectStore.getState().assets.models.find(m => m.id === modelId)
+                  if (targetModel) {
+                    const newTransforms = {
+                      ...(targetModel.meshTransforms || {}),
+                      [meshInfo.name]: {
+                        position: pos,
+                        rotation: postRotation.toArray().slice(0, 3) as [number, number, number],
+                        scale: postScale.toArray() as [number, number, number]
+                      }
+                    }
+                    useProjectStore.getState().updateModel(modelId, { meshTransforms: newTransforms })
+                  }
+                }
               }
               log('Redo transform')
             }

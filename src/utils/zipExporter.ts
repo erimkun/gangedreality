@@ -46,14 +46,87 @@ export async function exportProjectAsZip(
   // This matches the expected structure: /data/{projectId}/project.json
   log('Adding JSON config files')
   onProgress?.(10, 'Konfigürasyon dosyaları ekleniyor...')
+  
+  // Process interactions to safe interactions images
+  const interactionsClone = JSON.parse(JSON.stringify(projectData.interactions))
+  const win = window as any
+  
+  if (win.__interactionFiles && interactionsClone.zones) {
+      for (const zone of interactionsClone.zones) {
+          if (zone.popup?.blocks) {
+              for (const block of zone.popup.blocks) {
+                  if (block.type === 'image' && block.content && block.content.startsWith('blob:')) {
+                      if (win.__interactionFiles.has(block.content)) {
+                          const file = win.__interactionFiles.get(block.content)
+                          if (file) {
+                              const fileName = `int_${zone.id}_${block.id}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+                              const arrayBuffer = await file.arrayBuffer()
+                              texturesFolder?.file(fileName, arrayBuffer)
+                              block.content = `textures/${fileName}`
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+  zip.file('interactions.json', JSON.stringify(interactionsClone, null, 2))
   zip.file('project.json', JSON.stringify(projectData.project, null, 2))
-  zip.file('scene.json', JSON.stringify(projectData.scene, null, 2))
-  zip.file('interactions.json', JSON.stringify(projectData.interactions, null, 2))
-  zip.file('variants.json', JSON.stringify(projectData.variants, null, 2))
+  // zip.file('scene.json', JSON.stringify(projectData.scene, null, 2)) // Already saved with custom handling below
+  
+  // Process variants to replace Blob URLs with relative paths
+  const variantsClone = JSON.parse(JSON.stringify(projectData.variants))
+  
+  if (win.__blobUrlToFileName) {
+    variantsClone.configurableGroups.forEach((group: any) => {
+      group.options.forEach((option: any) => {
+        if (option.textureUrl && win.__blobUrlToFileName?.has(option.textureUrl)) {
+          option.textureUrl = win.__blobUrlToFileName.get(option.textureUrl)
+        }
+        if (option.normalMapUrl && win.__blobUrlToFileName?.has(option.normalMapUrl)) {
+          option.normalMapUrl = win.__blobUrlToFileName.get(option.normalMapUrl)
+        }
+        if (option.roughnessMapUrl && win.__blobUrlToFileName?.has(option.roughnessMapUrl)) {
+          option.roughnessMapUrl = win.__blobUrlToFileName.get(option.roughnessMapUrl)
+        }
+      })
+    })
+  }
+
+  // Process Scene Environment HDRI (Custom)
+  const sceneClone = JSON.parse(JSON.stringify(projectData.scene))
+  if (sceneClone.environment && sceneClone.environment.customHdriUrl) {
+      if (win.__blobUrlToFileName?.has(sceneClone.environment.customHdriUrl)) {
+          sceneClone.environment.customHdriUrl = win.__blobUrlToFileName.get(sceneClone.environment.customHdriUrl)
+      }
+  }
+  
+  // Process Hotspots Icons
+  const hotspotsClone = JSON.parse(JSON.stringify(projectData.hotspots))
+  if (hotspotsClone.nodes) {
+      hotspotsClone.nodes.forEach((node: any) => {
+          if (node.customIconUrl && win.__blobUrlToFileName?.has(node.customIconUrl)) {
+              node.customIconUrl = win.__blobUrlToFileName.get(node.customIconUrl)
+          }
+      })
+  }
+  if (hotspotsClone.settings && hotspotsClone.settings.defaultCustomIconUrl) {
+      if (win.__blobUrlToFileName?.has(hotspotsClone.settings.defaultCustomIconUrl)) {
+          hotspotsClone.settings.defaultCustomIconUrl = win.__blobUrlToFileName.get(hotspotsClone.settings.defaultCustomIconUrl)
+      }
+  }
+  
+  zip.file('variants.json', JSON.stringify(variantsClone, null, 2))
+  zip.file('hotspots.json', JSON.stringify(hotspotsClone, null, 2))
+  zip.file('scene.json', JSON.stringify(sceneClone, null, 2))
 
   // Add model file if available
-  if (options.includeModel && window.__loadedModelFile) {
-    const modelFile = window.__loadedModelFile
+  // Check both single file (legacy/import) and array (new upload)
+  const modelFileToExport = window.__loadedModelFile || (window.__loadedModelFiles && window.__loadedModelFiles.length > 0 ? window.__loadedModelFiles[0] : null)
+
+  if (options.includeModel && modelFileToExport) {
+    const modelFile = modelFileToExport
     log('Adding model file', { name: modelFile.name, size: modelFile.size })
     onProgress?.(30, 'Model dosyası ekleniyor...')
     const arrayBuffer = await modelFile.arrayBuffer()
@@ -63,7 +136,7 @@ export async function exportProjectAsZip(
     projectData.project.assets.mainModel = `model/${modelFile.name}`
     zip.file('project.json', JSON.stringify(projectData.project, null, 2))
   } else {
-    log('No model file to include', { includeModel: options.includeModel, hasFile: !!window.__loadedModelFile })
+    log('No model file to include', { includeModel: options.includeModel, hasFile: !!modelFileToExport })
   }
 
   // Add texture files if available
@@ -88,6 +161,7 @@ Bu proje Ganged Reality 3D CMS ile oluşturulmuştur.
 - \`scene.json\` - Sahne ve ışık ayarları
 - \`interactions.json\` - Etkileşim noktaları
 - \`variants.json\` - Materyal varyasyonları
+- \`hotspots.json\` - Navigasyon noktaları
 - \`model/\` - 3D model dosyaları
 - \`textures/\` - Texture ve HDRi dosyaları
 
@@ -118,84 +192,4 @@ Versiyon: ${projectData.project.version}
   log('Export complete!')
 }
 
-/**
- * Imports a project from a ZIP file
- */
-export async function importProjectFromZip(file: File): Promise<FullProjectData | null> {
-  log('Starting ZIP import', { filename: file.name, size: file.size })
-  
-  try {
-    const zip = await JSZip.loadAsync(file)
-    log('ZIP loaded, reading contents')
-    
-    // Read project.json
-    const projectFile = zip.file('data/project.json')
-    if (!projectFile) {
-      log('ERROR: project.json not found')
-      throw new Error('project.json bulunamadı')
-    }
-    const projectJson = await projectFile.async('string')
-    const project = JSON.parse(projectJson)
-    log('project.json parsed', { projectId: project.projectId })
 
-    // Read scene.json
-    const sceneFile = zip.file('data/scene.json')
-    const scene = sceneFile 
-      ? JSON.parse(await sceneFile.async('string'))
-      : null
-    log('scene.json', sceneFile ? 'loaded' : 'not found')
-
-    // Read interactions.json
-    const interactionsFile = zip.file('data/interactions.json')
-    const interactions = interactionsFile
-      ? JSON.parse(await interactionsFile.async('string'))
-      : { zones: [] }
-    log('interactions.json', { zoneCount: interactions.zones?.length || 0 })
-
-    // Read variants.json
-    const variantsFile = zip.file('data/variants.json')
-    const variants = variantsFile
-      ? JSON.parse(await variantsFile.async('string'))
-      : { configurableGroups: [] }
-    log('variants.json', { groupCount: variants.configurableGroups?.length || 0 })
-
-    // Extract model file and create blob URL
-    const modelFiles = zip.folder('model')?.file(/.+/)
-    if (modelFiles && modelFiles.length > 0) {
-      const modelFile = modelFiles[0]
-      log('Extracting model', { name: modelFile.name })
-      const modelBlob = await modelFile.async('blob')
-      const modelFileObj = new File([modelBlob], modelFile.name, { type: 'model/gltf-binary' })
-      window.__loadedModelFile = modelFileObj
-      
-      // Create blob URL for immediate use
-      const blobUrl = URL.createObjectURL(modelBlob)
-      project.assets.mainModel = blobUrl
-      log('Model blob URL created', { blobUrl })
-    }
-
-    // Extract texture files
-    window.__loadedTextures = new Map()
-    const textureFiles = zip.folder('textures')?.file(/.+/)
-    if (textureFiles) {
-      log('Extracting textures', { count: textureFiles.length })
-      for (const textureFile of textureFiles) {
-        const blob = await textureFile.async('blob')
-        const fileObj = new File([blob], textureFile.name)
-        window.__loadedTextures.set(textureFile.name, fileObj)
-      }
-    }
-
-    log('Import complete!')
-    return {
-      project,
-      scene,
-      interactions,
-      variants
-    }
-  } catch (error) {
-    log('ERROR: Import failed', error)
-    console.error('ZIP import error:', error)
-    return null
-  }
-}

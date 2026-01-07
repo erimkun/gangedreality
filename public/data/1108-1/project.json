@@ -7,6 +7,47 @@
   "assets": {
     "mainModel": "/data/1108-1/model/uk_01_deneme.glb",
     "envMap": null,
-    "models": []
+    "models": [
+      {
+        "id": "main-model",
+        "name": "Main Model",
+        "url": "/data/1108-1/model/uk_01_deneme.glb",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "visible": true,
+        "meshTransforms": {
+          "135____012": {
+            "position": [
+              14.61596,
+              27.25081218127956,
+              -4.461554
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        }
+      }
+    ]
   }
 }

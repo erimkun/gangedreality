@@ -10,6 +10,7 @@ export { default as PlayerSettingsPanel } from './PlayerSettingsPanel'
 export { default as InteractionsPanel } from './InteractionsPanel'
 export { default as VariantsPanel } from './VariantsPanel'
 export { default as EffectsPanel } from './EffectsPanel'
+export { default as HotspotPanel } from './HotspotPanel'
 
 // Shared UI Components
 export * from './shared'

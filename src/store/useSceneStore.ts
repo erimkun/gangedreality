@@ -30,6 +30,9 @@ interface SceneStore extends SceneConfig {
   // Effects Actions
   updateEffects: (config: Partial<EffectsConfig> | ((prev: EffectsConfig) => Partial<EffectsConfig>)) => void
 
+  // Mesh Actions
+  addDeletedMesh: (id: string) => void
+
   // General Actions
   loadFromConfig: (config: SceneConfig) => void
   getConfig: () => SceneConfig
@@ -99,10 +102,15 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     }
   }),
 
+  addDeletedMesh: (id) => set((state) => ({
+    deletedMeshIds: [...(state.deletedMeshIds || []), id]
+  })),
+
   loadFromConfig: (config) => set(() => ({
     ...config,
     // Ensure defaults if missing in loaded config
-    effects: config.effects || defaultSceneConfig.effects
+    effects: config.effects || defaultSceneConfig.effects,
+    deletedMeshIds: config.deletedMeshIds || []
   })),
 
   getConfig: () => {
@@ -112,7 +120,8 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
       lights: state.lights,
       player: state.player,
       camera: state.camera,
-      effects: state.effects
+      effects: state.effects,
+      deletedMeshIds: state.deletedMeshIds || []
     }
   },
 

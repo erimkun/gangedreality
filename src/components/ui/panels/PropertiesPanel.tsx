@@ -4,8 +4,8 @@
 
 import { useMemo, useCallback } from 'react'
 import { useEditorStore } from '../../../store/useEditorStore'
-import { useSceneStore } from '../../../store/useSceneStore'
 import { useVariantsStore } from '../../../store/useVariantsStore'
+import { useHotspotStore } from '../../../store/useHotspotStore'
 import { DraggableNumberInput, EmptyState } from './shared'
 
 export default function PropertiesPanel() {
@@ -22,47 +22,31 @@ export default function PropertiesPanel() {
     toggleTransformSpace,
     setActivePanel
   } = useEditorStore()
-  const { player, updatePlayer } = useSceneStore()
   const { createGroup } = useVariantsStore()
+  const { settings: hotspotSettings, toggleWalkableMesh } = useHotspotStore()
   
   const isMultiSelect = selectedObjects.length > 1
   
-  // Collision mesh kontrolü - mesh name kullan (daha güvenilir)
-  const collisionMeshIds = useMemo(() => player.collisionMeshIds || [], [player.collisionMeshIds])
   const meshIdForCollision = selectedMeshName || selectedObjectId || ''
-  
-  const isCollisionEnabled = useMemo(() => {
-    if (isMultiSelect) {
-      return selectedMeshNames.every(name => collisionMeshIds.includes(name))
-    }
-    return meshIdForCollision ? collisionMeshIds.includes(meshIdForCollision) : false
-  }, [isMultiSelect, selectedMeshNames, meshIdForCollision, collisionMeshIds])
-  
-  const toggleCollision = useCallback(() => {
-    const currentIds = [...collisionMeshIds]
-    
-    if (isMultiSelect) {
-      // Multi-select: toggle all
-      const allEnabled = selectedMeshNames.every(name => currentIds.includes(name))
-      if (allEnabled) {
-        // Remove all
-        const newIds = currentIds.filter(id => !selectedMeshNames.includes(id))
-        updatePlayer({ collisionMeshIds: newIds })
-      } else {
-        // Add all missing
-        const newIds = [...new Set([...currentIds, ...selectedMeshNames])]
-        updatePlayer({ collisionMeshIds: newIds })
-      }
-    } else if (meshIdForCollision) {
-      // Single select
-      if (currentIds.includes(meshIdForCollision)) {
-        updatePlayer({ collisionMeshIds: currentIds.filter(id => id !== meshIdForCollision) })
-      } else {
-        updatePlayer({ collisionMeshIds: [...currentIds, meshIdForCollision] })
-      }
-    }
-  }, [isMultiSelect, selectedMeshNames, meshIdForCollision, collisionMeshIds, updatePlayer])
 
+  // Walkable Mesh Logic (Hotspot Navigation)
+  const walkableMeshIds = useMemo(() => hotspotSettings.walkableMeshIds || [], [hotspotSettings.walkableMeshIds])
+  
+  const isWalkableEnabled = useMemo(() => {
+    if (isMultiSelect) {
+      return selectedMeshNames.every(name => walkableMeshIds.includes(name))
+    }
+    return meshIdForCollision ? walkableMeshIds.includes(meshIdForCollision) : false
+  }, [isMultiSelect, selectedMeshNames, meshIdForCollision, walkableMeshIds])
+
+  const handleToggleWalkable = useCallback(() => {
+    if (isMultiSelect) {
+      selectedMeshNames.forEach(name => toggleWalkableMesh(name))
+    } else if (meshIdForCollision) {
+      toggleWalkableMesh(meshIdForCollision)
+    }
+  }, [isMultiSelect, selectedMeshNames, meshIdForCollision, toggleWalkableMesh])
+  
   const handleCreateVariantGroup = () => {
     const meshNames = selectedMeshNames.length > 0 ? selectedMeshNames : (selectedMeshName ? [selectedMeshName] : [])
     if (meshNames.length > 0) {
@@ -127,7 +111,25 @@ export default function PropertiesPanel() {
             ))}
           </div>
         </div>
-        
+        {/* Walkable Toggle (Hotspot Navigation) */}
+        <div className="bg-editor-bg border border-white/10 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-gray-300">Yürünebilir Alan (Navigasyon)</span>
+            <button
+              onClick={handleToggleWalkable}
+              className={`w-10 h-5 rounded-full transition-colors relative ${
+                isWalkableEnabled ? 'bg-green-500' : 'bg-gray-600'
+              }`}
+            >
+              <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${
+                isWalkableEnabled ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-500">
+            Aktif edilirse, oyuncu bu objelerin üzerinde yürüyebilir (imleç görünür).
+          </p>
+        </div>        
         {/* Center position - editable, moves all selected objects */}
         <div className="bg-editor-bg rounded-lg p-3">
           <h4 className="text-gray-300 text-sm mb-2">Merkez Nokta (Toplu Taşı)</h4>
@@ -178,11 +180,11 @@ export default function PropertiesPanel() {
         </div>
         
         {/* Collision Toggle */}
-        <CollisionToggle 
+        {/* <CollisionToggle 
           isEnabled={isCollisionEnabled}
           onToggle={toggleCollision}
           description="Player bu mesh'lere çarpacak"
-        />
+        /> */}
       </div>
     )
   }
@@ -259,6 +261,26 @@ export default function PropertiesPanel() {
           />
         </div>
       </div>
+
+      {/* Walkable Toggle (Hotspot Navigation) */}
+      <div className="bg-editor-bg border border-white/10 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-gray-300">Yürünebilir Alan (Navigasyon)</span>
+          <button
+            onClick={handleToggleWalkable}
+            className={`w-10 h-5 rounded-full transition-colors relative ${
+              isWalkableEnabled ? 'bg-green-500' : 'bg-gray-600'
+            }`}
+          >
+            <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${
+              isWalkableEnabled ? 'translate-x-5' : 'translate-x-0'
+            }`} />
+          </button>
+        </div>
+        <p className="text-[10px] text-gray-500">
+          Aktif edilirse, oyuncu bu objenin üzerinde yürüyebilir (imleç görünür).
+        </p>
+      </div>
       
       {/* Scale */}
       <div className="bg-editor-bg rounded-lg p-3">
@@ -294,11 +316,11 @@ export default function PropertiesPanel() {
       {/* Actions */}
       <div className="pt-4 border-t border-gray-700 space-y-3">
         {/* Collision Toggle */}
-        <CollisionToggle 
+        {/* <CollisionToggle 
           isEnabled={isCollisionEnabled}
           onToggle={toggleCollision}
           description="Player bu mesh'e çarpacak"
-        />
+        /> */}
         
         <button 
           onClick={handleCreateVariantGroup}
@@ -366,28 +388,5 @@ function TransformTools({ activeTool, setActiveTool, transformSpace, toggleTrans
         Uzay: {transformSpace === 'world' ? '🌍 Dünya' : '📦 Lokal'}
       </button>
     </div>
-  )
-}
-
-interface CollisionToggleProps {
-  isEnabled: boolean
-  onToggle: () => void
-  description: string
-}
-
-function CollisionToggle({ isEnabled, onToggle, description }: CollisionToggleProps) {
-  return (
-    <label className="flex items-center gap-3 cursor-pointer bg-editor-bg rounded-lg p-3">
-      <input
-        type="checkbox"
-        checked={isEnabled}
-        onChange={onToggle}
-        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-primary focus:ring-primary"
-      />
-      <div>
-        <span className="text-gray-300 text-sm">🧱 Collision Aktif</span>
-        <p className="text-xs text-gray-500">{description}</p>
-      </div>
-    </label>
   )
 }

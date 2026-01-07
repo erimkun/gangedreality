@@ -65,6 +65,13 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
 
     const handleImageUpload = (id: string, file: File) => {
         const url = URL.createObjectURL(file)
+        
+        // Store file reference globally for export
+        if (!window.__interactionFiles) {
+            window.__interactionFiles = new Map()
+        }
+        window.__interactionFiles.set(url, file)
+        
         updateBlock(id, { content: url })
     }
 

@@ -62,5 +62,38 @@
       6.635964100549071
     ],
     "fov": 50
-  }
+  },
+  "effects": {
+    "ao": {
+      "enabled": true,
+      "color": "#000000",
+      "intensity": 0.6,
+      "radius": 1.6,
+      "distanceFalloff": 0.9,
+      "luminanceInfluence": 0.1,
+      "quality": "low"
+    },
+    "bloom": {
+      "enabled": false,
+      "intensity": 1,
+      "luminanceThreshold": 0.9,
+      "luminanceSmoothing": 0.025
+    },
+    "vignette": {
+      "enabled": false,
+      "offset": 0.5,
+      "darkness": 0.5
+    },
+    "colorGrading": {
+      "enabled": false,
+      "brightness": -0.08,
+      "contrast": 0.1,
+      "saturation": 0.35,
+      "hue": 0
+    }
+  },
+  "deletedMeshIds": [
+    "4a75ea0f-675d-40c1-8d36-15899a4b6a85",
+    "135____012"
+  ]
 }

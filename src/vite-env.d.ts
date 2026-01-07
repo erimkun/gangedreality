@@ -5,6 +5,9 @@ declare global {
   interface Window {
     __loadedTextures?: Map<string, File>
     __loadedModelFile?: File
+    __loadedModelFiles?: File[]
+    __blobUrlToFileName?: Map<string, string>
+    __interactionFiles?: Map<string, File>
   }
 }
 

@@ -1,0 +1,96 @@
+{
+  "nodes": [
+    {
+      "id": "7LQXxSg91LctiMPR-h73V",
+      "position": [
+        18.1130446110874,
+        17.69962684082031,
+        -3.3106162871684326
+      ],
+      "visible": true,
+      "label": "Nokta 1"
+    },
+    {
+      "id": "QPFdqa9GdpdzW3P_ftgS1",
+      "position": [
+        15.287165610419088,
+        17.69962684082031,
+        0.1382034919323365
+      ],
+      "visible": true,
+      "label": "Nokta 2"
+    },
+    {
+      "id": "SXvXMq1-M1E2dfa-7lhbE",
+      "position": [
+        15.029003806063521,
+        17.69962684082031,
+        -3.734154730094338
+      ],
+      "visible": true,
+      "label": "Nokta 3"
+    },
+    {
+      "id": "XYUu7UPikOqlglJQS-QcH",
+      "position": [
+        9.628435198250786,
+        17.69962684082031,
+        -3.962771807164353
+      ],
+      "visible": true,
+      "label": "Nokta 4"
+    },
+    {
+      "id": "w4SA2wSMm6xJBKCTu25q9",
+      "position": [
+        7.821328559499317,
+        17.69962684082031,
+        -0.3007472732683816
+      ],
+      "visible": true,
+      "label": "Nokta 5"
+    },
+    {
+      "id": "OY-PndHckdrhF9ud7_2kY",
+      "position": [
+        10.246105828660092,
+        17.69962684082031,
+        -0.39042592542888865
+      ],
+      "visible": true,
+      "label": "Nokta 6"
+    },
+    {
+      "id": "GymxyZN7HwWLMtQ8s3IFi",
+      "position": [
+        5.17776851070766,
+        17.69962684082031,
+        -3.863865736846937
+      ],
+      "visible": true,
+      "label": "Nokta 7"
+    },
+    {
+      "id": "3udhIVixkPEYh84t0Rq9G",
+      "position": [
+        4.941289430079749,
+        17.69962684082031,
+        -0.31551595521405584
+      ],
+      "visible": true,
+      "label": "Nokta 8"
+    }
+  ],
+  "settings": {
+    "cursorColor": "#ffffff",
+    "cursorSize": 0.4,
+    "cursorOpacity": 0.8,
+    "defaultShape": "ring",
+    "animationDuration": 1,
+    "nodeColor": "#ffffff",
+    "nodeHoverColor": "#60a5fa",
+    "walkableMeshIds": [
+      "135____011"
+    ]
+  }
+}

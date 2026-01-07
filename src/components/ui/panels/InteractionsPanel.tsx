@@ -56,9 +56,6 @@ export default function InteractionsPanel() {
                 <span className="text-white text-sm truncate">{zone.popup.title || 'Yeni Nokta'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-gray-500 bg-editor-bg px-2 py-0.5 rounded">
-                  {zone.triggerType === 'proximity' ? '🚶 Yaklaşınca' : '👆 Tıklayınca'}
-                </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); removeZone(zone.id) }}
                   className="text-red-400 hover:text-red-300 p-1"
@@ -175,19 +172,6 @@ function ContentTab({ zone, updateZone, updateZonePopup }: ContentTabProps) {
           onChange={(e) => updateZone(zone.id, { radius: parseFloat(e.target.value) })}
           className="w-full accent-primary"
         />
-      </div>
-
-      {/* Trigger Type */}
-      <div className="space-y-1">
-        <label className="text-xs text-gray-400">Tetikleme Türü</label>
-        <select
-          value={zone.triggerType}
-          onChange={(e) => updateZone(zone.id, { triggerType: e.target.value as 'proximity' | 'click' })}
-          className="w-full bg-editor-panel border border-editor-border rounded-lg px-3 py-2 text-white text-sm focus:border-primary"
-        >
-          <option value="proximity">🚶 Yaklaşınca Göster</option>
-          <option value="click">👆 Tıklayınca Göster</option>
-        </select>
       </div>
 
       <hr className="border-editor-border" />
@@ -410,7 +394,9 @@ function PopupPreview({ zone, onClose }: PopupPreviewProps) {
         {/* Render Blocks */}
         <BlockRenderer blocks={zone.popup.blocks || []} />
 
-        <p className="text-center text-[10px] mt-4 opacity-50 border-t border-white/5 pt-2">Kapatmak için tıklayın</p>
+        <p className="text-center text-[10px] mt-4 opacity-50 border-t border-white/5 pt-2 cursor-pointer hover:opacity-100 transition-opacity" onClick={onClose}>
+          Kapatmak için tıklayın
+        </p>
       </div>
 
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/50 text-sm flex items-center gap-2">

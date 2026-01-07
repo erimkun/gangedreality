@@ -20,6 +20,7 @@ import {
   InteractionsPanel,
   VariantsPanel,
   EffectsPanel,
+  HotspotPanel,
   PanelTab
 } from './panels'
 
@@ -28,7 +29,7 @@ import {
 // ============================================
 
 interface PanelConfig {
-  id: 'properties' | 'lights' | 'player' | 'interactions' | 'variants' | 'effects'
+  id: 'properties' | 'lights' | 'player' | 'interactions' | 'variants' | 'effects' | 'hotspots'
   label: string
   icon: string
   component: React.ComponentType
@@ -41,6 +42,7 @@ const panelConfigs: PanelConfig[] = [
   { id: 'interactions', label: 'Noktalar', icon: '📍', component: InteractionsPanel },
   { id: 'variants', label: 'Varyant', icon: '🎨', component: VariantsPanel },
   { id: 'effects', label: 'Efektler', icon: '✨', component: EffectsPanel },
+  { id: 'hotspots', label: 'Navigasyon', icon: '🧭', component: HotspotPanel },
 ]
 
 // ============================================
@@ -60,7 +62,7 @@ export default function EditorPanel() {
   const ActivePanelComponent = panelConfigs.find(p => p.id === activePanel)?.component || PropertiesPanel
 
   return (
-    <div className="absolute right-4 top-20 bottom-20 w-80 bg-editor-panel/95 backdrop-blur-sm rounded-xl border border-gray-700 flex flex-col overflow-hidden">
+    <div className="absolute right-4 top-20 bottom-20 w-96 bg-editor-panel/95 backdrop-blur-sm rounded-xl border border-gray-700 flex flex-col overflow-hidden">
       {/* Panel Tabs */}
       <div className="flex border-b border-gray-700">
         {panelConfigs.map(panel => (

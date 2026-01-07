@@ -62,19 +62,6 @@
       ],
       "defaultOptionIndex": 0,
       "selectedOptionIndex": null
-    },
-    {
-      "id": "group_fodzcv8go",
-      "displayName": "3 Mesh Grubu",
-      "icon": null,
-      "targetMeshNames": [
-        "135____011",
-        "136____011",
-        "136____011_1"
-      ],
-      "options": [],
-      "defaultOptionIndex": null,
-      "selectedOptionIndex": null
     }
   ]
 }
