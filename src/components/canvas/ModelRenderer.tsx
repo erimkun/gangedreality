@@ -394,7 +394,7 @@ function LoadedModel({
                         tiling: [tilingX, tilingY]
                       })
                     }, 
-                    (progress) => {
+                    () => {
                       // Loading progress
                     },
                     (err) => {

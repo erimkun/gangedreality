@@ -102,20 +102,22 @@ export default function VariantsPanel() {
   const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<string | null>(null)
   
   // Edit option state - includes all editable properties
+  type Option = {
+    name: string
+    type: string
+    value?: string
+    textureUrl?: string
+    normalMapUrl?: string
+    roughnessMapUrl?: string
+    metalness?: number
+    roughness?: number
+    tiling?: [number, number]
+  }
+
   const [editingOption, setEditingOption] = useState<{
     groupId: string
     optionIndex: number
-    option: {
-      name: string
-      type: string
-      value?: string
-      textureUrl?: string
-      normalMapUrl?: string
-      roughnessMapUrl?: string
-      metalness?: number
-      roughness?: number
-      tiling?: [number, number]
-    }
+    option: Option
   } | null>(null)
   
   const { addToast } = useToastStore()
@@ -345,7 +347,7 @@ export default function VariantsPanel() {
     })
   }
 
-  const handleEditOption = (groupId: string, optionIndex: number, option: typeof editingOption['option']) => {
+  const handleEditOption = (groupId: string, optionIndex: number, option: Option) => {
     setEditingOption({
       groupId,
       optionIndex,
@@ -356,7 +358,7 @@ export default function VariantsPanel() {
   }
 
   // Live preview - updates both local state and store for real-time changes on model
-  const updateEditingOptionLive = (updates: Partial<typeof editingOption['option']>) => {
+  const updateEditingOptionLive = (updates: Partial<Option>) => {
     if (!editingOption) return
     
     const newOption = { ...editingOption.option, ...updates }
