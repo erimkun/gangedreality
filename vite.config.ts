@@ -12,5 +12,17 @@ export default defineConfig({
   },
   // Alt klasörden çalıştırma için base ayarı
   // Production'da dinamik olarak ayarlanabilir
-  base: './',
+  base: '/',
+  build: {
+    chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+             return 'vendor';
+          }
+        }
+      }
+    }
+  }
 })
