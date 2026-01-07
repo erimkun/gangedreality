@@ -289,21 +289,23 @@ function LoadedModel({
     
   }, [scene, isEditor, registerMeshes, unregisterMesh, config.id, deletedMeshIds])
   
-  // Apply variant materials - Only in Viewer/Player mode, not in Editor
+  // Apply variant materials - Works in both Editor and Viewer modes for live preview
   useEffect(() => {
-    // Skip variant application in editor mode
-    if (isEditor) {
-      log('LoadedModel', 'Skipping variant application in editor mode')
-      return
-    }
-    
     log('LoadedModel', 'Applying variant materials', { 
-      groupCount: configurableGroups.length 
+      groupCount: configurableGroups.length,
+      isEditor
     })
+    
+    // Skip if no groups
+    if (configurableGroups.length === 0) return
     
     // Cache for created variant materials to share them across meshes
     // Key format: `${groupId}-${optionIndex}-${originalMaterialUuid}`
     const variantMaterialCache = new Map<string, THREE.Material>()
+    
+    // Create texture loader with crossOrigin support for blob URLs
+    const textureLoader = new THREE.TextureLoader()
+    textureLoader.crossOrigin = 'anonymous'
 
     configurableGroups.forEach(group => {
       // Skip if no option selected
@@ -311,6 +313,13 @@ function LoadedModel({
       
       const selectedOption = group.options[group.selectedOptionIndex]
       if (!selectedOption) return
+      
+      log('LoadedModel', `Processing group: ${group.displayName}`, {
+        selectedIndex: group.selectedOptionIndex,
+        optionName: selectedOption.name,
+        optionType: selectedOption.type,
+        meshCount: group.targetMeshNames.length
+      })
       
       scene.traverse((child: THREE.Object3D) => {
         if (child instanceof THREE.Mesh && group.targetMeshNames.includes(child.name)) {
@@ -340,54 +349,96 @@ function LoadedModel({
               if (selectedOption.type === 'color' && selectedOption.value) {
                 stdMat.color.set(selectedOption.value)
                 stdMat.map = null // Remove texture if switching to color
+                // Apply metalness and roughness for color variants too
+                if (selectedOption.metalness !== undefined) stdMat.metalness = selectedOption.metalness
+                if (selectedOption.roughness !== undefined) stdMat.roughness = selectedOption.roughness
                 stdMat.needsUpdate = true
               } else if (selectedOption.type === 'texture') {
-                const textureLoader = new THREE.TextureLoader()
+                // Get tiling values with defaults
+                const tilingX = selectedOption.tiling?.[0] ?? 1
+                const tilingY = selectedOption.tiling?.[1] ?? 1
                 
-                // Helper to apply tiling
-                const applyTiling = (tex: THREE.Texture) => {
-                  if (selectedOption.tiling) {
-                    tex.wrapS = THREE.RepeatWrapping
-                    tex.wrapT = THREE.RepeatWrapping
-                    tex.repeat.set(selectedOption.tiling![0], selectedOption.tiling![1])
+                // Helper to apply tiling and UV settings
+                const applyTextureSettings = (tex: THREE.Texture, isSRGB: boolean = false) => {
+                  // Always enable repeat wrapping for proper UV handling
+                  tex.wrapS = THREE.RepeatWrapping
+                  tex.wrapT = THREE.RepeatWrapping
+                  tex.repeat.set(tilingX, tilingY)
+                  
+                  // Flip Y for proper orientation (common for uploaded textures)
+                  tex.flipY = true
+                  
+                  // Set color space
+                  if (isSRGB) {
+                    tex.colorSpace = THREE.SRGBColorSpace
                   }
+                  
+                  // Generate mipmaps for better quality
+                  tex.generateMipmaps = true
+                  tex.minFilter = THREE.LinearMipmapLinearFilter
+                  tex.magFilter = THREE.LinearFilter
                 }
 
                 // 1. Load Albedo/Color Map
                 if (selectedOption.textureUrl) {
-                  textureLoader.load(selectedOption.textureUrl, (texture) => {
-                    applyTiling(texture)
-                    texture.colorSpace = THREE.SRGBColorSpace
-                    stdMat.map = texture
-                    stdMat.color.set('#ffffff') 
-                    stdMat.needsUpdate = true
-                    log('LoadedModel', `Texture loaded for ${child.name}`)
-                  }, undefined, (err) => console.error('Error loading texture', err))
+                  log('LoadedModel', `Loading texture from: ${selectedOption.textureUrl}`)
+                  textureLoader.load(
+                    selectedOption.textureUrl, 
+                    (texture) => {
+                      applyTextureSettings(texture, true) // sRGB for color maps
+                      stdMat.map = texture
+                      stdMat.color.set('#ffffff') // Reset color to white so texture shows properly
+                      stdMat.needsUpdate = true
+                      log('LoadedModel', `✓ Texture loaded for ${child.name}`, { 
+                        size: `${texture.image?.width}x${texture.image?.height}`,
+                        tiling: [tilingX, tilingY]
+                      })
+                    }, 
+                    (progress) => {
+                      // Loading progress
+                    },
+                    (err) => {
+                      console.error('Error loading texture:', err, selectedOption.textureUrl)
+                    }
+                  )
                 }
 
                 // 2. Load Normal Map
                 if (selectedOption.normalMapUrl) {
-                  textureLoader.load(selectedOption.normalMapUrl, (normalMap) => {
-                    applyTiling(normalMap)
-                    stdMat.normalMap = normalMap
-                    stdMat.needsUpdate = true
-                    log('LoadedModel', `Normal map loaded for ${child.name}`)
-                  }, undefined, (err) => console.error('Error loading normal map', err))
+                  textureLoader.load(
+                    selectedOption.normalMapUrl, 
+                    (normalMap) => {
+                      applyTextureSettings(normalMap, false) // Linear for normal maps
+                      normalMap.colorSpace = THREE.NoColorSpace
+                      stdMat.normalMap = normalMap
+                      stdMat.needsUpdate = true
+                      log('LoadedModel', `✓ Normal map loaded for ${child.name}`)
+                    }, 
+                    undefined, 
+                    (err) => console.error('Error loading normal map', err)
+                  )
                 }
 
                 // 3. Load Roughness Map
                 if (selectedOption.roughnessMapUrl) {
-                  textureLoader.load(selectedOption.roughnessMapUrl, (roughnessMap) => {
-                    applyTiling(roughnessMap)
-                    stdMat.roughnessMap = roughnessMap
-                    stdMat.needsUpdate = true
-                    log('LoadedModel', `Roughness map loaded for ${child.name}`)
-                  }, undefined, (err) => console.error('Error loading roughness map', err))
+                  textureLoader.load(
+                    selectedOption.roughnessMapUrl, 
+                    (roughnessMap) => {
+                      applyTextureSettings(roughnessMap, false) // Linear for roughness maps
+                      roughnessMap.colorSpace = THREE.NoColorSpace
+                      stdMat.roughnessMap = roughnessMap
+                      stdMat.needsUpdate = true
+                      log('LoadedModel', `✓ Roughness map loaded for ${child.name}`)
+                    }, 
+                    undefined, 
+                    (err) => console.error('Error loading roughness map', err)
+                  )
                 }
 
-                // Apply scalar values if present
+                // Apply scalar values immediately
                 if (selectedOption.metalness !== undefined) stdMat.metalness = selectedOption.metalness
                 if (selectedOption.roughness !== undefined) stdMat.roughness = selectedOption.roughness
+                stdMat.needsUpdate = true
               }
             } else {
               // Fallback for non-standard materials (just clone for now)

@@ -62,6 +62,40 @@
       ],
       "defaultOptionIndex": 0,
       "selectedOptionIndex": null
+    },
+    {
+      "id": "group_qv0ld1h0h",
+      "displayName": "154____011_1 Grubu",
+      "icon": null,
+      "targetMeshNames": [],
+      "options": [
+        {
+          "name": "asdfasf",
+          "type": "texture",
+          "textureUrl": "textures/variant_1767768887503_diff_gerialbuton.png",
+          "normalMapUrl": "textures/variant_1767768887503_norm_gerialbuton.png",
+          "roughnessMapUrl": "textures/variant_1767768887503_rough_vr menü list -2.jpg",
+          "metalness": 0.6,
+          "roughness": 1,
+          "tiling": [
+            1,
+            1
+          ]
+        },
+        {
+          "name": "sadfasf",
+          "type": "texture",
+          "textureUrl": "textures/variant_1767768981019_diff_gerialbuton.png",
+          "metalness": 0.7,
+          "roughness": 1,
+          "tiling": [
+            1,
+            1
+          ]
+        }
+      ],
+      "defaultOptionIndex": null,
+      "selectedOptionIndex": 0
     }
   ]
 }
