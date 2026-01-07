@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useVariantsStore } from '../../../store/useVariantsStore'
+import type { VariantOption } from '../../../types'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useToastStore } from '../../../store/useToastStore'
 import { EmptyState } from './shared'
@@ -102,22 +103,10 @@ export default function VariantsPanel() {
   const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<string | null>(null)
   
   // Edit option state - includes all editable properties
-  type Option = {
-    name: string
-    type: string
-    value?: string
-    textureUrl?: string
-    normalMapUrl?: string
-    roughnessMapUrl?: string
-    metalness?: number
-    roughness?: number
-    tiling?: [number, number]
-  }
-
   const [editingOption, setEditingOption] = useState<{
     groupId: string
     optionIndex: number
-    option: Option
+    option: VariantOption
   } | null>(null)
   
   const { addToast } = useToastStore()
@@ -347,7 +336,7 @@ export default function VariantsPanel() {
     })
   }
 
-  const handleEditOption = (groupId: string, optionIndex: number, option: Option) => {
+  const handleEditOption = (groupId: string, optionIndex: number, option: VariantOption) => {
     setEditingOption({
       groupId,
       optionIndex,
@@ -358,7 +347,7 @@ export default function VariantsPanel() {
   }
 
   // Live preview - updates both local state and store for real-time changes on model
-  const updateEditingOptionLive = (updates: Partial<Option>) => {
+  const updateEditingOptionLive = (updates: Partial<VariantOption>) => {
     if (!editingOption) return
     
     const newOption = { ...editingOption.option, ...updates }
