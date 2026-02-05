@@ -19,12 +19,12 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
   const [cursorPosition, setCursorPosition] = useState(new THREE.Vector3(0, 0, 0))
   const [isCursorVisible, setIsCursorVisible] = useState(false)
   const [isMoving, setIsMoving] = useState(false)
-  
+
   // Drag to look state
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, y: 0 })
   const wasDrag = useRef(false)
-  
+
   // Fixed eye height
   const EYE_HEIGHT = 1.7
 
@@ -33,24 +33,29 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
     if (enabled && startPosition) {
       // User sets the exact camera position for start in editor, so use it directly
       camera.position.set(startPosition[0], startPosition[1], startPosition[2])
-      
+
       // IMPORTANT: Before changing rotation order, extract the current look direction
       // and recalculate proper YXZ euler angles without roll
       const currentQuat = camera.quaternion.clone()
       const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(currentQuat)
-      
+
       // Calculate yaw (Y rotation) and pitch (X rotation) from direction
       const yaw = Math.atan2(-direction.x, -direction.z)
       const pitch = Math.asin(Math.max(-1, Math.min(1, direction.y))) // Clamp for safety
-      
+
       // Now set rotation order and apply clean YXZ rotation (no roll)
       camera.rotation.order = 'YXZ'
       camera.rotation.set(pitch, yaw, 0) // pitch, yaw, roll=0
-      
+
       // Initial update
       if (onPositionChange) {
         onPositionChange(camera.position.clone(), camera.rotation.y)
       }
+    }
+
+    // Cleanup navigation state on unmount
+    return () => {
+      setIsNavigating(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, startPosition, camera]) // Removed onPositionChange to prevent reset loop
@@ -76,10 +81,10 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
 
     const onPointerMove = (e: PointerEvent) => {
       if (!isDragging.current) return
-      
+
       const deltaX = e.clientX - dragStart.current.x
       const deltaY = e.clientY - dragStart.current.y
-      
+
       // If moved more than a few pixels, consider it a drag
       if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
         wasDrag.current = true
@@ -91,7 +96,7 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
         camera.rotation.x -= deltaY * sensitivity
         // Clamp pitch
         camera.rotation.x = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, camera.rotation.x))
-        
+
         dragStart.current = { x: e.clientX, y: e.clientY }
       }
     }
@@ -128,17 +133,17 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
 
     // Raycast to ground
     raycaster.setFromCamera(pointer, camera)
-    
+
     // Intersect with everything, filter for ground-like objects (up facing normal)
     const intersects = raycaster.intersectObjects(scene.children, true)
-    
+
     let groundPoint: THREE.Vector3 | null = null
-    
+
     for (const hit of intersects) {
       // Check if mesh is walkable (if list is defined)
       const mesh = hit.object as THREE.Mesh
       const meshName = mesh.name || mesh.uuid
-      
+
       // If walkableMeshIds is set and not empty, only allow those meshes
       if (settings.walkableMeshIds && settings.walkableMeshIds.length > 0) {
         if (!settings.walkableMeshIds.includes(meshName)) {
@@ -170,7 +175,7 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
       const nodePos = new THREE.Vector3(...node.position)
       // Ignore Y for distance check (2D distance)
       const dist = Math.sqrt(
-        Math.pow(nodePos.x - cursorPosition.x, 2) + 
+        Math.pow(nodePos.x - cursorPosition.x, 2) +
         Math.pow(nodePos.z - cursorPosition.z, 2)
       )
 
@@ -179,7 +184,7 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
         nearestNode = node
       }
     }
-    
+
     if (nearestNode) {
       moveToNode(nearestNode.position)
     }
@@ -192,7 +197,7 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
 
     // Target height is node floor position + eye height
     const targetVec = new THREE.Vector3(targetPos[0], targetPos[1] + EYE_HEIGHT, targetPos[2])
-    
+
     // Animate camera position
     gsap.to(camera.position, {
       x: targetVec.x,

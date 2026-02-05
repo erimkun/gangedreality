@@ -258,9 +258,12 @@ export default function EditorPage() {
           dpr={[1, 2]}
         >
           <FPSCounter />
-          
+
           {/* Default Lighting */}
           <ambientLight intensity={0.3} />
+
+          {/* Force background color to prevent "Hall of Mirrors" effect when preserveDrawingBuffer is on */}
+          {(!environment.showBackground) && <color attach="background" args={['#000000']} />}
 
           {/* Dynamic Lights from Store */}
           <LightingManager isEditor />
@@ -398,8 +401,8 @@ export default function EditorPage() {
               <button
                 onClick={() => setActiveTool('translate')}
                 className={`size-9 flex items-center justify-center rounded-full transition-all ${activeTool === 'translate'
-                    ? 'bg-primary text-editor-bg shadow-lg shadow-primary/30'
-                    : 'text-white/80 hover:bg-white/10'
+                  ? 'bg-primary text-editor-bg shadow-lg shadow-primary/30'
+                  : 'text-white/80 hover:bg-white/10'
                   }`}
                 title="Taşı (W)"
               >
@@ -410,8 +413,8 @@ export default function EditorPage() {
               <button
                 onClick={() => setActiveTool('rotate')}
                 className={`size-9 flex items-center justify-center rounded-full transition-all ${activeTool === 'rotate'
-                    ? 'bg-primary text-editor-bg shadow-lg shadow-primary/30'
-                    : 'text-white/80 hover:bg-white/10'
+                  ? 'bg-primary text-editor-bg shadow-lg shadow-primary/30'
+                  : 'text-white/80 hover:bg-white/10'
                   }`}
                 title="Döndür (E)"
               >
@@ -422,8 +425,8 @@ export default function EditorPage() {
               <button
                 onClick={() => setActiveTool('scale')}
                 className={`size-9 flex items-center justify-center rounded-full transition-all ${activeTool === 'scale'
-                    ? 'bg-primary text-editor-bg shadow-lg shadow-primary/30'
-                    : 'text-white/80 hover:bg-white/10'
+                  ? 'bg-primary text-editor-bg shadow-lg shadow-primary/30'
+                  : 'text-white/80 hover:bg-white/10'
                   }`}
                 title="Ölçekle (R)"
               >

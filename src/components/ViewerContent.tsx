@@ -541,6 +541,9 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
           {/* Default ambient light */}
           <ambientLight intensity={0.3} />
 
+          {/* Force background color to prevent "Hall of Mirrors" effect when preserveDrawingBuffer is on */}
+          {(!environment.showBackground) && <color attach="background" args={['#000000']} />}
+
           {/* Dynamic Lights from Store */}
           <LightingManager showHelpers={false} />
 

@@ -183,6 +183,7 @@ export const useHotspotStore = create<HotspotStore>()(
           }
         }
       },
+      version: 1, // Force cleanup of old state to prevent "ghost nodes"
     }
   )
 )
