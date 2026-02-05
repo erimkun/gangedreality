@@ -114,6 +114,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         log('Converted model path', { original: projectData.assets.mainModel, resolved: assets.mainModel })
       }
 
+      // Resolve relative paths for all models in the models array
+      if (assets.models && assets.models.length > 0) {
+        assets.models.forEach(model => {
+          if (model.url && !model.url.startsWith('/') && !model.url.startsWith('blob:') && !model.url.startsWith('http')) {
+            const originalUrl = model.url
+            model.url = `/data/${projectId}/${model.url}`
+            log('Converted sub-model path', { original: originalUrl, resolved: model.url })
+          }
+        })
+      }
+
       // Migration: If models is empty but mainModel exists, populate models
       if (assets.models.length === 0 && assets.mainModel) {
         assets.models.push({
