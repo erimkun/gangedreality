@@ -1,10 +1,10 @@
 import { create } from 'zustand'
-import { 
-  ProjectConfig, 
+import {
+  ProjectConfig,
   ModelConfig,
-  defaultProjectConfig, 
+  defaultProjectConfig,
   createDefaultProject,
-  FullProjectData 
+  FullProjectData
 } from '@/types'
 import { useSceneStore } from './useSceneStore'
 import { useInteractionsStore } from './useInteractionsStore'
@@ -34,24 +34,24 @@ interface ProjectState {
     envMap: string | null
     models: ModelConfig[]
   }
-  
+
   // Loading State
   isLoading: boolean
   projectExists: boolean
   error: string | null
-  
+
   // Actions
   loadProject: (projectId: string) => Promise<boolean>
   createNewProject: (projectId: string, projectName: string) => void
   updateProjectName: (name: string) => void
   setMainModel: (url: string) => void
   setEnvMap: (url: string) => void
-  
+
   // Multiple Model Actions
   addModel: (url: string, name?: string) => string
   updateModel: (id: string, updates: Partial<Omit<ModelConfig, 'id'>>) => void
   removeModel: (id: string) => void
-  
+
   getFullProjectData: () => FullProjectData
   resetProject: () => void
 }
@@ -64,7 +64,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   defaultMode: defaultProjectConfig.defaultMode,
   editorLock: defaultProjectConfig.editorLock,
   assets: { ...defaultProjectConfig.assets, models: [] },
-  
+
   isLoading: false,
   projectExists: false,
   error: null,
@@ -73,25 +73,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   loadProject: async (projectId: string) => {
     log('loadProject', { projectId })
     set({ isLoading: true, error: null })
-    
+
     try {
       // Try to fetch project.json from the data folder
       const response = await fetch(`/data/${projectId}/project.json`)
-      
+
       if (!response.ok) {
         log('loadProject', 'Project not found, creating new')
         // Project doesn't exist
-        set({ 
-          isLoading: false, 
+        set({
+          isLoading: false,
           projectExists: false,
-          projectId 
+          projectId
         })
         return false
       }
-      
+
       const projectData: ProjectConfig = await response.json()
       log('loadProject', { projectData })
-      
+
       // Load other config files
       const [sceneRes, interactionsRes, variantsRes, hotspotsRes] = await Promise.all([
         fetch(`/data/${projectId}/scene.json`).catch(() => null),
@@ -99,11 +99,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         fetch(`/data/${projectId}/variants.json`).catch(() => null),
         fetch(`/data/${projectId}/hotspots.json`).catch(() => null)
       ])
-      
+
       // Convert relative model path to absolute path
       // e.g., "model/file.glb" -> "/data/projectId/model/file.glb"
       const assets = { ...projectData.assets }
-      
+
       // Ensure models array exists for backward compatibility
       if (!assets.models) {
         assets.models = []
@@ -116,7 +116,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
       // Migration: If models is empty but mainModel exists, populate models
       if (assets.models.length === 0 && assets.mainModel) {
-         assets.models.push({
+        assets.models.push({
           id: 'main-model',
           name: 'Main Model',
           url: assets.mainModel,
@@ -124,9 +124,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           rotation: [0, 0, 0],
           scale: [1, 1, 1],
           visible: true
-         })
+        })
       }
-      
+
       // Update project store
       set({
         projectId: projectData.projectId,
@@ -138,52 +138,52 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         isLoading: false,
         projectExists: true
       })
-      
+
       // Update scene store if scene.json exists
       if (sceneRes?.ok) {
         const sceneData = await sceneRes.json()
-        
+
         // Resolve custom HDRI path
         if (sceneData.environment && sceneData.environment.customHdriUrl) {
-             const url = sceneData.environment.customHdriUrl
-             if (!url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
-                 sceneData.environment.customHdriUrl = `/data/${projectId}/${url}`
-             }
+          const url = sceneData.environment.customHdriUrl
+          if (!url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
+            sceneData.environment.customHdriUrl = `/data/${projectId}/${url}`
+          }
         }
-        
+
         useSceneStore.getState().loadFromConfig(sceneData)
       }
-      
+
       // Update interactions store if interactions.json exists
       if (interactionsRes?.ok) {
         const interactionsData = await interactionsRes.json()
-        
+
         // Resolve relative paths in interactions (images, etc)
         if (interactionsData.zones) {
-            interactionsData.zones.forEach((zone: any) => {
-                // Resolve popup header mediaUrl
-                if (zone.popup?.mediaUrl && !zone.popup.mediaUrl.startsWith('/') && !zone.popup.mediaUrl.startsWith('http') && !zone.popup.mediaUrl.startsWith('blob:')) {
-                     zone.popup.mediaUrl = `/data/${projectId}/${zone.popup.mediaUrl}`
+          interactionsData.zones.forEach((zone: any) => {
+            // Resolve popup header mediaUrl
+            if (zone.popup?.mediaUrl && !zone.popup.mediaUrl.startsWith('/') && !zone.popup.mediaUrl.startsWith('http') && !zone.popup.mediaUrl.startsWith('blob:')) {
+              zone.popup.mediaUrl = `/data/${projectId}/${zone.popup.mediaUrl}`
+            }
+
+            // Resolve block images
+            if (zone.popup?.blocks) {
+              zone.popup.blocks.forEach((block: any) => {
+                if (block.type === 'image' && block.content && !block.content.startsWith('/') && !block.content.startsWith('http') && !block.content.startsWith('blob:')) {
+                  block.content = `/data/${projectId}/${block.content}`
                 }
-                
-                // Resolve block images
-                if (zone.popup?.blocks) {
-                    zone.popup.blocks.forEach((block: any) => {
-                        if (block.type === 'image' && block.content && !block.content.startsWith('/') && !block.content.startsWith('http') && !block.content.startsWith('blob:')) {
-                            block.content = `/data/${projectId}/${block.content}`
-                        }
-                    })
-                }
-            })
+              })
+            }
+          })
         }
-        
+
         useInteractionsStore.getState().loadFromConfig(interactionsData)
       }
-      
+
       // Update variants store if variants.json exists
       if (variantsRes?.ok) {
         const variantsData = await variantsRes.json()
-        
+
         // Resolve relative paths in variants
         if (variantsData.configurableGroups) {
           variantsData.configurableGroups.forEach((group: any) => {
@@ -212,43 +212,43 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (hotspotsRes?.ok) {
         try {
           const hotspotsData = await hotspotsRes.json()
-          
+
           // Resolve custom icons in nodes
           if (hotspotsData.settings && hotspotsData.settings.defaultCustomIconUrl) {
-               const url = hotspotsData.settings.defaultCustomIconUrl
-               if (!url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
-                   hotspotsData.settings.defaultCustomIconUrl = `/data/${projectId}/${url}`
-               }
+            const url = hotspotsData.settings.defaultCustomIconUrl
+            if (!url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
+              hotspotsData.settings.defaultCustomIconUrl = `/data/${projectId}/${url}`
+            }
           }
 
           if (hotspotsData.nodes) {
-              hotspotsData.nodes.forEach((node: any) => {
-                  if (node.customIconUrl && !node.customIconUrl.startsWith('/') && !node.customIconUrl.startsWith('http') && !node.customIconUrl.startsWith('blob:')) {
-                      node.customIconUrl = `/data/${projectId}/${node.customIconUrl}`
-                  }
-              })
+            hotspotsData.nodes.forEach((node: any) => {
+              if (node.customIconUrl && !node.customIconUrl.startsWith('/') && !node.customIconUrl.startsWith('http') && !node.customIconUrl.startsWith('blob:')) {
+                node.customIconUrl = `/data/${projectId}/${node.customIconUrl}`
+              }
+            })
           }
-          
+
           // Resolve default custom icon
           if (hotspotsData.settings && hotspotsData.settings.defaultCustomIconUrl) {
-               const url = hotspotsData.settings.defaultCustomIconUrl
-               if (url && !url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
-                   hotspotsData.settings.defaultCustomIconUrl = `/data/${projectId}/${url}`
-               }
+            const url = hotspotsData.settings.defaultCustomIconUrl
+            if (url && !url.startsWith('/') && !url.startsWith('http') && !url.startsWith('blob:')) {
+              hotspotsData.settings.defaultCustomIconUrl = `/data/${projectId}/${url}`
+            }
           }
-          
+
           useHotspotStore.getState().setNodes(hotspotsData.nodes || [])
           useHotspotStore.getState().updateSettings(hotspotsData.settings || {})
         } catch (e) {
           console.warn('Failed to parse hotspots.json', e)
         }
       }
-      
+
       return true
     } catch (error) {
       console.error('Failed to load project:', error)
-      set({ 
-        isLoading: false, 
+      set({
+        isLoading: false,
         projectExists: false,
         error: 'Proje yüklenirken hata oluştu',
         projectId
@@ -260,7 +260,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   // Create new project with default values
   createNewProject: (projectId: string, projectName: string) => {
     const defaultData = createDefaultProject(projectId, projectName)
-    
+
     set({
       projectId: defaultData.project.projectId,
       projectName: defaultData.project.projectName,
@@ -271,11 +271,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectExists: true,
       isLoading: false
     })
-    
+
     // Initialize other stores with defaults
     useSceneStore.getState().loadFromConfig(defaultData.scene)
     useInteractionsStore.getState().loadFromConfig(defaultData.interactions)
     useVariantsStore.getState().loadFromConfig(defaultData.variants)
+    useHotspotStore.getState().loadFromConfig(defaultData.hotspots)
   },
 
   updateProjectName: (name: string) => {
@@ -298,7 +299,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   addModel: (url: string, name?: string) => {
     const id = generateId()
     const modelName = name || `Model ${get().assets.models.length + 1}`
-    
+
     const newModel: ModelConfig = {
       id,
       name: modelName,
@@ -308,12 +309,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       scale: [1, 1, 1],
       visible: true
     }
-    
+
     log('addModel', { id, url, name: modelName })
-    
+
     set(state => {
       let currentModels = state.assets.models || []
-      
+
       // Migration: If no models but mainModel exists, add it as the first model
       if (currentModels.length === 0 && state.assets.mainModel) {
         currentModels = [{
@@ -334,7 +335,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
       }
     })
-    
+
     return id
   },
 

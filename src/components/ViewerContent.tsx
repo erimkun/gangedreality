@@ -23,17 +23,18 @@ import { useHotspotStore, HotspotNode } from '@/store/useHotspotStore'
 import { FPSCounter } from '@/components/ui/FPSCounter'
 import { ControlsInfo } from '@/components/ui/ControlsInfo'
 import BlockRenderer from '@/components/ui/BlockRenderer'
+import HdriSphere from '@/components/canvas/HdriSphere'
 
 type ViewMode = 'orbit' | 'player'
 
 // Camera Tracker to keep track of camera state for transitions
-function CameraTracker({ 
-  onUpdate 
-}: { 
-  onUpdate: (state: { position: THREE.Vector3, rotation: THREE.Euler, quaternion: THREE.Quaternion, target: THREE.Vector3 }) => void 
+function CameraTracker({
+  onUpdate
+}: {
+  onUpdate: (state: { position: THREE.Vector3, rotation: THREE.Euler, quaternion: THREE.Quaternion, target: THREE.Vector3 }) => void
 }) {
   const { camera, controls } = useThree()
-  
+
   useFrame(() => {
     const target = new THREE.Vector3()
     const orbit = controls as any
@@ -44,7 +45,7 @@ function CameraTracker({
       const direction = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation)
       target.copy(camera.position).add(direction.multiplyScalar(5))
     }
-    
+
     onUpdate({
       position: camera.position.clone(),
       rotation: camera.rotation.clone(),
@@ -52,26 +53,26 @@ function CameraTracker({
       target
     })
   })
-  
+
   return null
 }
 
 // Camera Transition Manager
-function CameraTransitionManager({ 
-  target, 
+function CameraTransitionManager({
+  target,
   startTarget: initialTargetProp,
   initialCameraState,
-  onComplete 
-}: { 
+  onComplete
+}: {
   target: { pos: number[], rot?: number[], lookAt?: number[] } | null
   startTarget?: THREE.Vector3
   initialCameraState?: { position: THREE.Vector3, quaternion: THREE.Quaternion } | null
-  onComplete: () => void 
+  onComplete: () => void
 }) {
   const { camera, controls } = useThree()
   const progress = useRef(0)
   const active = useRef(false)
-  
+
   const startPos = useRef(new THREE.Vector3())
   const startTarget = useRef(new THREE.Vector3())
   const startQuat = useRef(new THREE.Quaternion())
@@ -84,7 +85,7 @@ function CameraTransitionManager({
     if (target && controls) {
       active.current = true
       progress.current = 0
-      
+
       // Start points
       if (initialCameraState) {
         startPos.current.copy(initialCameraState.position)
@@ -93,7 +94,7 @@ function CameraTransitionManager({
         startPos.current.copy(camera.position)
         startQuat.current.copy(camera.quaternion)
       }
-      
+
       if (initialTargetProp) {
         startTarget.current.copy(initialTargetProp)
       } else {
@@ -102,10 +103,10 @@ function CameraTransitionManager({
           startTarget.current.copy(orbit.target)
         }
       }
-      
+
       // End points
       endPos.current.set(target.pos[0], target.pos[1], target.pos[2])
-      
+
       if (target.lookAt) {
         // Explicit lookAt target
         endTarget.current.set(target.lookAt[0], target.lookAt[1], target.lookAt[2])
@@ -122,27 +123,27 @@ function CameraTransitionManager({
       const m = new THREE.Matrix4()
       m.lookAt(endPos.current, endTarget.current, new THREE.Vector3(0, 1, 0))
       endQuat.current.setFromRotationMatrix(m)
-      
+
       // Control point for curve (midpoint + up)
       controlPoint.current.copy(startPos.current).add(endPos.current).multiplyScalar(0.5)
       // Add some height for the "arc" effect, proportional to distance
       const distance = startPos.current.distanceTo(endPos.current)
       // Reduced height factor from 0.2 to 0.1 and base height from 2 to 0.5
-      controlPoint.current.y += Math.max(0.5, distance * 0.1) 
-      
+      controlPoint.current.y += Math.max(0.5, distance * 0.1)
+
     }
   }, [target, camera, controls, initialTargetProp])
 
   useFrame((_state, delta) => {
     if (!active.current) return
-    
+
     // Animation speed - Reduced from 0.8 to 0.4 (approx 2.5 seconds duration)
-    progress.current += delta * 0.4 
-    
+    progress.current += delta * 0.4
+
     if (progress.current >= 1) {
       progress.current = 1
       active.current = false
-      
+
       // Sync controls at the end
       if (controls) {
         const orbit = controls as any
@@ -151,31 +152,31 @@ function CameraTransitionManager({
           orbit.update()
         }
       }
-      
+
       onComplete()
       return
     }
-    
+
     const t = progress.current
     // Ease In Out Cubic
     const easedT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-    
+
     // Quadratic Bezier for Position
     const p0 = startPos.current
     const p1 = controlPoint.current
     const p2 = endPos.current
-    
+
     const invT = 1 - easedT
-    
+
     // Update Position
     camera.position.x = (invT * invT * p0.x) + (2 * invT * easedT * p1.x) + (easedT * easedT * p2.x)
     camera.position.y = (invT * invT * p0.y) + (2 * invT * easedT * p1.y) + (easedT * easedT * p2.y)
     camera.position.z = (invT * invT * p0.z) + (2 * invT * easedT * p1.z) + (easedT * easedT * p2.z)
-    
+
     // Slerp Rotation (Smoother than lookAt interpolation)
     camera.quaternion.slerpQuaternions(startQuat.current, endQuat.current, easedT)
   })
-  
+
   return null
 }
 
@@ -194,12 +195,12 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
 
   const [viewMode, setViewMode] = useState<ViewMode>('orbit')
   const [activePopup, setActivePopup] = useState<typeof zones[0] | null>(null)
-  
+
   // Use ref for position to avoid re-renders on every frame
   const playerPositionRef = useRef<THREE.Vector3 | null>(
     player.startPosition ? new THREE.Vector3(...player.startPosition) : null
   )
-  
+
   // Keep rotation in state for UI, but throttle updates
   const [playerRotation, setPlayerRotation] = useState<number>(
     player.startRotation ? (player.startRotation[1] || 0) : 0
@@ -213,10 +214,10 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
   const [transitionStartState, setTransitionStartState] = useState<{ position: THREE.Vector3, quaternion: THREE.Quaternion } | null>(null)
   const destinationMode = useRef<ViewMode | null>(null)
   const [orbitTarget, setOrbitTarget] = useState<THREE.Vector3>(new THREE.Vector3())
-  
+
   // Track real-time camera state
   const cameraStateRef = useRef<{ position: THREE.Vector3, rotation: THREE.Euler, quaternion: THREE.Quaternion, target: THREE.Vector3 } | null>(null)
-  
+
   // Track dismissed popup ID to prevent immediate reopening
   const dismissedPopupId = useRef<string | null>(null)
 
@@ -273,16 +274,16 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
   useEffect(() => {
     const handleModelClick = (e: CustomEvent) => {
       if (viewMode !== 'orbit') return
-      
+
       const point = e.detail.point as THREE.Vector3
       const nodes = useHotspotStore.getState().nodes // Use direct store access to get latest nodes
-      
+
       if (!nodes || nodes.length === 0) return
 
       // Find nearest node
       let nearestNode: HotspotNode | null = null
       let minDist = Infinity
-      
+
       for (const node of nodes) {
         const nodePos = new THREE.Vector3(...node.position)
         const dist = nodePos.distanceTo(point)
@@ -302,9 +303,9 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
         // We calculate the Yaw (Y) and Pitch (X) from the current camera direction vector
         const direction = new THREE.Vector3(0, 0, -1)
         if (cameraStateRef.current) {
-            direction.applyQuaternion(cameraStateRef.current.quaternion)
+          direction.applyQuaternion(cameraStateRef.current.quaternion)
         }
-        
+
         const angleY = Math.atan2(-direction.x, -direction.z)
         const pitch = Math.asin(direction.y)
 
@@ -312,11 +313,11 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
         useSceneStore.getState().updatePlayer({
           startPosition: targetPos,
         })
-        
+
         // Trigger switch to player mode with explicit target to avoid stale state
-        handleModeSwitch('player', { 
-            pos: targetPos, 
-            rot: [pitch, angleY, 0] // Pass calculated rotation [Pitch, Yaw, Roll]
+        handleModeSwitch('player', {
+          pos: targetPos,
+          rot: [pitch, angleY, 0] // Pass calculated rotation [Pitch, Yaw, Roll]
         })
       }
     }
@@ -336,39 +337,39 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
 
       // If no explicit target provided (e.g. Menu Click), snap to nearest node from startPosition
       if (!targetPos && player.startPosition) {
-         const nodes = useHotspotStore.getState().nodes
-         if (nodes && nodes.length > 0) {
-             const startVec = new THREE.Vector3(...player.startPosition)
-             let nearest: HotspotNode | null = null
-             let minDist = Infinity
-             
-             for (const node of nodes) {
-                 const nodePos = new THREE.Vector3(...node.position)
-                 const dist = nodePos.distanceTo(startVec)
-                 if (dist < minDist) {
-                     minDist = dist
-                     nearest = node
-                 }
-             }
+        const nodes = useHotspotStore.getState().nodes
+        if (nodes && nodes.length > 0) {
+          const startVec = new THREE.Vector3(...player.startPosition)
+          let nearest: HotspotNode | null = null
+          let minDist = Infinity
 
-             if (nearest) {
-                 const node = nearest as HotspotNode
-                 const EYE_HEIGHT = 1.7
-                 targetPos = [node.position[0], node.position[1] + EYE_HEIGHT, node.position[2]] as [number, number, number]
-                 
-                 // Update global store so NodeNavigationControls picks it up correctly on mount
-                 // This prevents "blinking" where it jumps to original startPos then to node
-                 useSceneStore.getState().updatePlayer({
-                    startPosition: targetPos as [number, number, number]
-                 })
+          for (const node of nodes) {
+            const nodePos = new THREE.Vector3(...node.position)
+            const dist = nodePos.distanceTo(startVec)
+            if (dist < minDist) {
+              minDist = dist
+              nearest = node
+            }
+          }
 
-                 // For Menu Navigation, we respect player.startRotation (targetRot already set above)
-             } else {
-                 targetPos = player.startPosition
-             }
-         } else {
-             targetPos = player.startPosition
-         }
+          if (nearest) {
+            const node = nearest as HotspotNode
+            const EYE_HEIGHT = 1.7
+            targetPos = [node.position[0], node.position[1] + EYE_HEIGHT, node.position[2]] as [number, number, number]
+
+            // Update global store so NodeNavigationControls picks it up correctly on mount
+            // This prevents "blinking" where it jumps to original startPos then to node
+            useSceneStore.getState().updatePlayer({
+              startPosition: targetPos as [number, number, number]
+            })
+
+            // For Menu Navigation, we respect player.startRotation (targetRot already set above)
+          } else {
+            targetPos = player.startPosition
+          }
+        } else {
+          targetPos = player.startPosition
+        }
       }
 
       if (targetPos) {
@@ -385,16 +386,16 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
     } else {
       // Switch to orbit with animation
       destinationMode.current = 'orbit'
-      
+
       // Calculate current look target to prevent jumping
       let currentTarget = new THREE.Vector3()
-      
+
       if (cameraStateRef.current) {
         // Use actual camera rotation from tracker
         const { position, rotation, quaternion } = cameraStateRef.current
         const direction = new THREE.Vector3(0, 0, -1).applyEuler(rotation)
         currentTarget.copy(position).add(direction.multiplyScalar(5))
-        
+
         // Capture start state for smooth transition
         setTransitionStartState({
           position: position.clone(),
@@ -409,16 +410,16 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
         // Fallback
         currentTarget.copy(initialTarget.current)
       }
-      
+
       // Set orbit target to current view so it doesn't snap
       setOrbitTarget(currentTarget)
       setViewMode('orbit')
-      
+
       // Animate to default orbit position
       setIsTransitioning(true)
       setTransitionTarget({
-          pos: initialCameraPos.current.toArray(),
-          lookAt: initialTarget.current.toArray()
+        pos: initialCameraPos.current.toArray(),
+        lookAt: initialTarget.current.toArray()
       })
     }
   }, [viewMode, player.startPosition, player.startRotation, playerRotation])
@@ -427,7 +428,7 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
     setTransitionTarget(null)
     setTransitionStartState(null)
     setIsTransitioning(false)
-    
+
     if (destinationMode.current === 'player') {
       setViewMode('player')
     } else if (destinationMode.current === 'orbit') {
@@ -466,7 +467,7 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
   const handlePlayerPositionChange = useCallback((position: THREE.Vector3, rotationY: number) => {
     // Update ref immediately for logic that needs current position
     playerPositionRef.current = position
-    
+
     // Throttle state updates for UI (Minimap rotation, etc.) to 10fps
     const now = Date.now()
     if (now - lastRotationUpdate.current > 100) {
@@ -480,16 +481,16 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
     // Use the raw position argument, not state
     for (const zone of zones) {
       if (dismissedPopupId.current === zone.id) {
-          // If we are currently in a dismissed zone, check if we left it
-          const zonePos = new THREE.Vector3(...zone.position)
-          const distance = position.distanceTo(zonePos)
-          if (distance >= zone.radius) {
-              // User left the dismissed zone, reset dismissal so it can open again if they return
-              dismissedPopupId.current = null
-          }
-          continue
+        // If we are currently in a dismissed zone, check if we left it
+        const zonePos = new THREE.Vector3(...zone.position)
+        const distance = position.distanceTo(zonePos)
+        if (distance >= zone.radius) {
+          // User left the dismissed zone, reset dismissal so it can open again if they return
+          dismissedPopupId.current = null
+        }
+        continue
       }
-      
+
       const zonePos = new THREE.Vector3(...zone.position)
       const distance = position.distanceTo(zonePos)
 
@@ -547,13 +548,24 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
           {environment.hdriPreset !== 'custom' ? (
             <Environment
               preset={environment.hdriPreset || 'apartment'}
-              background={environment.showBackground || false}
+              background={environment.showBackground && environment.backgroundType !== 'sphere' || false}
             />
           ) : environment.customHdriUrl ? (
-            <Environment
-              files={environment.customHdriUrl}
-              background={environment.showBackground || false}
-            />
+            <>
+              <Environment
+                files={environment.customHdriUrl}
+                background={environment.showBackground && environment.backgroundType !== 'sphere' || false}
+              />
+              {/* HDRI Sphere Mode */}
+              {environment.backgroundType === 'sphere' && (
+                <HdriSphere
+                  url={environment.customHdriUrl}
+                  position={environment.spherePosition || [0, 0, 0]}
+                  scale={environment.sphereScale || 100}
+                  rotation={environment.sphereRotation || 0}
+                />
+              )}
+            </>
           ) : (
             <Environment
               preset="apartment"
@@ -599,19 +611,19 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
               />
               {/* Fly Controls - Left click + WASD */}
               <FlyControls />
-              
+
               {/* Camera Transition Manager */}
-              <CameraTransitionManager 
-                target={transitionTarget} 
+              <CameraTransitionManager
+                target={transitionTarget}
                 startTarget={viewMode === 'orbit' && destinationMode.current === 'orbit' ? orbitTarget : undefined}
                 initialCameraState={transitionStartState}
-                onComplete={handleTransitionComplete} 
+                onComplete={handleTransitionComplete}
               />
             </>
           )}
 
           {viewMode === 'player' && (
-            <NodeNavigationControls 
+            <NodeNavigationControls
               enabled={true}
               startPosition={player.startPosition}
               onPositionChange={handlePlayerPositionChange}
@@ -627,7 +639,7 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
 
           {/* Post-Processing Effects */}
           <EffectsManager />
-          
+
           {/* Camera Tracker */}
           <CameraTracker onUpdate={(state) => cameraStateRef.current = state} />
         </Canvas>
@@ -753,11 +765,11 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
 
         {/* Interaction Popup */}
         {activePopup && viewMode === 'player' && (
-          <StyledPopup 
-            zone={activePopup} 
+          <StyledPopup
+            zone={activePopup}
             onClose={() => {
-                dismissedPopupId.current = activePopup.id
-                setActivePopup(null)
+              dismissedPopupId.current = activePopup.id
+              setActivePopup(null)
             }}
           />
         )}
@@ -809,13 +821,13 @@ function StyledPopup({ zone, onClose }: { zone: InteractionZone, onClose: () => 
         }}
       >
         <h2 className="text-xl font-bold mb-4 border-b border-white/10 pb-2">{zone.popup.title}</h2>
-        
+
         {/* Render Blocks */}
         <BlockRenderer blocks={zone.popup.blocks || []} />
-        
+
         {/* Helper text for proximity trigger */}
         <p className="text-center text-[10px] mt-4 opacity-50 border-t border-white/5 pt-2 cursor-pointer hover:opacity-100 transition-opacity" onClick={onClose}>
-            Kapatmak için tıklayın
+          Kapatmak için tıklayın
         </p>
       </div>
     </div>

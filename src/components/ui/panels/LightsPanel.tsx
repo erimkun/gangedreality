@@ -43,7 +43,7 @@ interface PositionInputProps {
 function PositionInput({ label, value, onChange }: PositionInputProps) {
   const colors = ['text-red-400', 'text-green-400', 'text-blue-400']
   const labels = ['X', 'Y', 'Z']
-  
+
   return (
     <div className="space-y-1">
       <label className="text-xs text-gray-400">{label}</label>
@@ -95,7 +95,7 @@ interface LightEditorProps {
 
 function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightEditorProps) {
   const [isOpen, setIsOpen] = useState(isSelected)
-  
+
   const borderColor = lightColors[light.type] || 'blue'
   const borderClasses: Record<string, string> = {
     yellow: 'border-yellow-500/30',
@@ -113,7 +113,7 @@ function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightE
   return (
     <div className={`bg-editor-bg rounded-lg border ${borderClasses[borderColor]} ${isSelected ? 'ring-2 ring-white/50' : ''}`}>
       {/* Header */}
-      <div 
+      <div
         className="flex items-center justify-between p-2 cursor-pointer hover:bg-white/5 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -136,17 +136,17 @@ function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightE
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
           </button>
-          <svg 
-            className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-            fill="none" 
-            stroke="currentColor" 
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
           </svg>
         </div>
       </div>
-      
+
       {/* Content */}
       {isOpen && (
         <div className="px-3 pb-3 space-y-3 border-t border-gray-700/50 pt-3">
@@ -156,7 +156,7 @@ function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightE
             value={light.color}
             onChange={(color) => onUpdate({ color })}
           />
-          
+
           <SliderInput
             label="Şiddet (Intensity)"
             value={light.intensity}
@@ -166,7 +166,7 @@ function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightE
             onChange={(intensity) => onUpdate({ intensity })}
             color={borderColor}
           />
-          
+
           {/* Position (not for ambient) */}
           {light.type !== 'ambient' && (
             <PositionInput
@@ -175,7 +175,7 @@ function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightE
               onChange={(position) => onUpdate({ position })}
             />
           )}
-          
+
           {/* Target (for directional and spot) */}
           {(light.type === 'directional' || light.type === 'spot') && (
             <PositionInput
@@ -184,7 +184,7 @@ function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightE
               onChange={(target) => onUpdate({ target })}
             />
           )}
-          
+
           {/* Spot Light specific */}
           {light.type === 'spot' && (
             <>
@@ -209,7 +209,7 @@ function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightE
               />
             </>
           )}
-          
+
           {/* Point/Spot Light specific */}
           {(light.type === 'point' || light.type === 'spot') && (
             <>
@@ -233,7 +233,7 @@ function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightE
               />
             </>
           )}
-          
+
           {/* Shadow Settings (not for ambient) */}
           {light.type !== 'ambient' && (
             <CollapsibleSection
@@ -251,7 +251,7 @@ function LightEditor({ light, onUpdate, onDelete, onSelect, isSelected }: LightE
                     className="w-4 h-4 accent-blue-500"
                   />
                 </div>
-                
+
                 {light.castShadow && (
                   <>
                     <SliderInput
@@ -315,7 +315,7 @@ const hdriPresets = [
 export default function LightsPanel() {
   const { lights, addLight, removeLight, updateLight, environment, updateEnvironment } = useSceneStore()
   const { selectedObjectId } = useEditorStore()
-  
+
   const handleAddLight = useCallback((type: LightConfig['type']) => {
     const id = addLight(type)
     // Auto-select new light
@@ -341,7 +341,7 @@ export default function LightsPanel() {
               <span className="text-sm">🌄</span>
               <span className="text-white text-sm font-medium">HDRI Environment</span>
             </div>
-            
+
             <div className="space-y-1">
               <label className="text-xs text-gray-400">Preset</label>
               <select
@@ -354,49 +354,54 @@ export default function LightsPanel() {
                 ))}
               </select>
             </div>
-            
+
             {environment.hdriPreset === 'custom' && (
               <div className="space-y-1">
                 <label className="text-xs text-gray-400">Özel HDRI (.hdr / .exr / .jpg)</label>
                 <div className="flex gap-2">
-                    <input
+                  <input
                     type="text"
                     value={environment.customHdriUrl || ''}
                     readOnly
                     placeholder="Dosya seçin..."
                     className="flex-1 bg-editor-bg border border-gray-600 rounded px-2 py-1.5 text-white text-sm focus:border-blue-400 focus:outline-none opacity-50 cursor-not-allowed"
-                    />
-                    <label className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white rounded px-3 py-1.5 text-xs flex items-center justify-center transition-colors">
-                        <span>Yükle</span>
-                        <input
-                            type="file"
-                            accept=".hdr,.exr,.jpg,.jpeg,.png"
-                            className="hidden"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0]
-                                if (file) {
-                                    const url = URL.createObjectURL(file)
-                                    
-                                    // Store for export
-                                    const win = window as any
-                                    if (!win.__loadedTextures) win.__loadedTextures = new Map()
-                                    // Use a unique name for export
-                                    const fileName = `hdri_${Date.now()}_${file.name}`
-                                    win.__loadedTextures.set(fileName, file)
-                                    
-                                    // Map blob to filename for export reference
-                                    if (!win.__blobUrlToFileName) win.__blobUrlToFileName = new Map()
-                                    win.__blobUrlToFileName.set(url, `textures/${fileName}`)
+                  />
+                  <label className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white rounded px-3 py-1.5 text-xs flex items-center justify-center transition-colors">
+                    <span>Yükle</span>
+                    <input
+                      type="file"
+                      accept=".hdr,.exr,.jpg,.jpeg,.png"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const rawUrl = URL.createObjectURL(file)
+                          // Append extension to URL hash so loaders can identify type
+                          const extension = file.name.split('.').pop()
+                          const url = `${rawUrl}#.${extension}`
 
-                                    updateEnvironment({ customHdriUrl: url })
-                                }
-                            }}
-                        />
-                    </label>
+                          // Store for export
+                          const win = window as any
+                          if (!win.__loadedTextures) win.__loadedTextures = new Map()
+                          // Use a unique name for export
+                          const fileName = `hdri_${Date.now()}_${file.name}`
+                          win.__loadedTextures.set(fileName, file)
+
+                          // Map blob to filename for export reference
+                          if (!win.__blobUrlToFileName) win.__blobUrlToFileName = new Map()
+                          // Store both versions just in case
+                          win.__blobUrlToFileName.set(rawUrl, `textures/${fileName}`)
+                          win.__blobUrlToFileName.set(url, `textures/${fileName}`)
+
+                          updateEnvironment({ customHdriUrl: url })
+                        }
+                      }}
+                    />
+                  </label>
                 </div>
               </div>
             )}
-            
+
             <SliderInput
               label="Environment Intensity"
               value={environment.intensity || 1}
@@ -406,7 +411,7 @@ export default function LightsPanel() {
               onChange={(intensity) => updateEnvironment({ intensity })}
               color="green"
             />
-            
+
             <div className="flex items-center justify-between">
               <label className="text-xs text-gray-400">Arka Plan Olarak Göster</label>
               <input
@@ -416,6 +421,58 @@ export default function LightsPanel() {
                 className="w-4 h-4 accent-blue-500"
               />
             </div>
+
+            {/* Background Mode Selection (Infinite vs Sphere) */}
+            {environment.customHdriUrl && (
+              <div className="pt-2 border-t border-gray-700/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-gray-400">Arka Plan Modu</label>
+                  <div className="flex bg-black/20 rounded p-0.5 border border-gray-700">
+                    <button
+                      onClick={() => updateEnvironment({ backgroundType: 'infinite', showBackground: true })}
+                      className={`px-2 py-1 text-[10px] rounded ${environment.backgroundType !== 'sphere' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Infinite
+                    </button>
+                    <button
+                      onClick={() => updateEnvironment({ backgroundType: 'sphere', showBackground: false })} // Hide env background when using sphere
+                      className={`px-2 py-1 text-[10px] rounded ${environment.backgroundType === 'sphere' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Sphere
+                    </button>
+                  </div>
+                </div>
+
+                {environment.backgroundType === 'sphere' && (
+                  <div className="space-y-2 animate-fade-in pl-2 border-l-2 border-blue-500/20">
+                    <PositionInput
+                      label="Küre Pozisyonu"
+                      value={environment.spherePosition || [0, 0, 0]}
+                      onChange={(val) => updateEnvironment({ spherePosition: val })}
+                    />
+                    <SliderInput
+                      label="Küre Boyutu"
+                      value={environment.sphereScale || 100}
+                      min={10}
+                      max={1000}
+                      step={10}
+                      onChange={(val) => updateEnvironment({ sphereScale: val })}
+                      color="blue"
+                    />
+                    <SliderInput
+                      label="Küre Rotasyonu (Y)"
+                      value={(environment.sphereRotation || 0) * 180 / Math.PI}
+                      min={0}
+                      max={360}
+                      step={1}
+                      unit="°"
+                      onChange={(val) => updateEnvironment({ sphereRotation: val * Math.PI / 180 })}
+                      color="blue"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Ambient Light */}
@@ -427,8 +484,8 @@ export default function LightsPanel() {
             <ColorInput
               label="Renk"
               value={environment.ambientLight?.color || '#ffffff'}
-              onChange={(color) => updateEnvironment({ 
-                ambientLight: { ...environment.ambientLight!, color } 
+              onChange={(color) => updateEnvironment({
+                ambientLight: { ...environment.ambientLight!, color }
               })}
             />
             <SliderInput
@@ -437,8 +494,8 @@ export default function LightsPanel() {
               min={0}
               max={2}
               step={0.05}
-              onChange={(intensity) => updateEnvironment({ 
-                ambientLight: { ...environment.ambientLight!, intensity } 
+              onChange={(intensity) => updateEnvironment({
+                ambientLight: { ...environment.ambientLight!, intensity }
               })}
               color="cyan"
             />
@@ -453,15 +510,15 @@ export default function LightsPanel() {
             <ColorInput
               label="Gökyüzü Rengi"
               value={environment.hemisphereLight?.skyColor || '#ffffff'}
-              onChange={(skyColor) => updateEnvironment({ 
-                hemisphereLight: { ...environment.hemisphereLight!, skyColor } 
+              onChange={(skyColor) => updateEnvironment({
+                hemisphereLight: { ...environment.hemisphereLight!, skyColor }
               })}
             />
             <ColorInput
               label="Zemin Rengi"
               value={environment.hemisphereLight?.groundColor || '#444444'}
-              onChange={(groundColor) => updateEnvironment({ 
-                hemisphereLight: { ...environment.hemisphereLight!, groundColor } 
+              onChange={(groundColor) => updateEnvironment({
+                hemisphereLight: { ...environment.hemisphereLight!, groundColor }
               })}
             />
             <SliderInput
@@ -470,8 +527,8 @@ export default function LightsPanel() {
               min={0}
               max={2}
               step={0.05}
-              onChange={(intensity) => updateEnvironment({ 
-                hemisphereLight: { ...environment.hemisphereLight!, intensity } 
+              onChange={(intensity) => updateEnvironment({
+                hemisphereLight: { ...environment.hemisphereLight!, intensity }
               })}
               color="blue"
             />
@@ -483,21 +540,21 @@ export default function LightsPanel() {
       <div className="space-y-2">
         <label className="text-xs text-gray-400 font-medium">Işık Ekle</label>
         <div className="grid grid-cols-3 gap-2">
-          <button 
+          <button
             onClick={() => handleAddLight('directional')}
             className="flex flex-col items-center gap-1 py-2 bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/30 text-yellow-400 rounded-lg transition-colors"
           >
             <span className="text-xl">☀️</span>
             <span className="text-[10px]">Directional</span>
           </button>
-          <button 
+          <button
             onClick={() => handleAddLight('point')}
             className="flex flex-col items-center gap-1 py-2 bg-orange-600/20 hover:bg-orange-600/40 border border-orange-500/30 text-orange-400 rounded-lg transition-colors"
           >
             <span className="text-xl">💡</span>
             <span className="text-[10px]">Point</span>
           </button>
-          <button 
+          <button
             onClick={() => handleAddLight('spot')}
             className="flex flex-col items-center gap-1 py-2 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-400 rounded-lg transition-colors"
           >
@@ -525,7 +582,7 @@ export default function LightsPanel() {
               </button>
             )}
           </div>
-          
+
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
             {lights.map((light) => (
               <LightEditor

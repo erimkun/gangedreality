@@ -51,6 +51,10 @@ export interface EnvironmentConfig {
   backgroundIntensity?: number
   backgroundColor?: string
   showBackground: boolean
+  backgroundType?: 'infinite' | 'sphere'
+  spherePosition?: [number, number, number]
+  sphereScale?: number
+  sphereRotation?: number // Y rotation in radians
 
   // Global Lights
   ambientLight: {
@@ -308,6 +312,10 @@ export const defaultSceneConfig: SceneConfig = {
     rotation: 0,
     backgroundBlurriness: 0.1,
     showBackground: false,
+    backgroundType: 'infinite',
+    spherePosition: [0, 0, 0],
+    sphereScale: 100,
+    sphereRotation: 0,
     ambientLight: {
       intensity: 0.5,
       color: '#ffffff'

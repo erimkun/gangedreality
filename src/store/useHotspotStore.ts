@@ -32,7 +32,7 @@ interface HotspotStore {
   nodes: HotspotNode[]
   settings: HotspotSettings
   isHotspotMode: boolean
-  
+
   // Actions
   addNode: (position: [number, number, number]) => void
   removeNode: (id: string) => void
@@ -41,6 +41,7 @@ interface HotspotStore {
   setHotspotMode: (enabled: boolean) => void
   setNodes: (nodes: HotspotNode[]) => void
   toggleWalkableMesh: (meshId: string) => void
+  loadFromConfig: (config: { nodes?: HotspotNode[], settings?: HotspotSettings }) => void
 }
 
 export const useHotspotStore = create<HotspotStore>()(
@@ -141,7 +142,7 @@ export const useHotspotStore = create<HotspotStore>()(
       })),
 
       setHotspotMode: (enabled) => set({ isHotspotMode: enabled }),
-      
+
       setNodes: (nodes) => set({ nodes }),
 
       toggleWalkableMesh: (meshId) => set((state) => {
@@ -150,11 +151,16 @@ export const useHotspotStore = create<HotspotStore>()(
         return {
           settings: {
             ...state.settings,
-            walkableMeshIds: exists 
+            walkableMeshIds: exists
               ? currentIds.filter(id => id !== meshId)
               : [...currentIds, meshId]
           }
         }
+      }),
+
+      loadFromConfig: (config) => set({
+        nodes: config.nodes || [],
+        settings: { ...get().settings, ...(config.settings || {}) },
       })
     }),
     {

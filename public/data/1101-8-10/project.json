@@ -1,0 +1,53 @@
+{
+  "projectId": "1101-8-10",
+  "projectName": "1101-8-10",
+  "version": "1.0",
+  "defaultMode": "viewer",
+  "editorLock": false,
+  "assets": {
+    "mainModel": "model/950_2.glb",
+    "envMap": null,
+    "models": [
+      {
+        "id": "model_kv9pemtbd",
+        "name": "950_2.glb",
+        "url": "blob:https://gangedreality.vercel.app/b37cf10e-6dab-474a-913f-aa5df95dcff9",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "visible": true,
+        "meshTransforms": {
+          "StaticMesh": {
+            "position": [
+              6.393197059631348,
+              1.9977439641952515,
+              0.41597527265548706
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.03937007859349251,
+              0.03937007859349251,
+              0.03937007859349251
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
