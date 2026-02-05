@@ -165,7 +165,24 @@ export const useHotspotStore = create<HotspotStore>()(
     }),
     {
       name: 'hotspot-storage',
-      partialize: (state) => ({ nodes: state.nodes, settings: state.settings }), // Only persist data, not UI state
+      partialize: (state) => {
+        // Sanitize function to remove blob URLs
+        const sanitizeUrl = (url?: string) => {
+          if (url && url.startsWith('blob:')) return undefined
+          return url
+        }
+
+        return {
+          nodes: state.nodes.map(node => ({
+            ...node,
+            customIconUrl: sanitizeUrl(node.customIconUrl)
+          })),
+          settings: {
+            ...state.settings,
+            defaultCustomIconUrl: sanitizeUrl(state.settings.defaultCustomIconUrl)
+          }
+        }
+      },
     }
   )
 )
