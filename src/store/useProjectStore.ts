@@ -405,5 +405,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectExists: false,
       error: null
     })
+
+    // Reset all other stores
+    const defaultData = createDefaultProject('temp', 'temp')
+    useSceneStore.getState().loadFromConfig(defaultData.scene)
+    useInteractionsStore.getState().loadFromConfig(defaultData.interactions)
+    useVariantsStore.getState().loadFromConfig(defaultData.variants)
+    useHotspotStore.getState().loadFromConfig(defaultData.hotspots)
   }
 }))
