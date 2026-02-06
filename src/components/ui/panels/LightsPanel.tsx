@@ -357,7 +357,7 @@ export default function LightsPanel() {
 
             {environment.hdriPreset === 'custom' && (
               <div className="space-y-1">
-                <label className="text-xs text-gray-400">Özel HDRI (.hdr / .exr / .jpg)</label>
+                <label className="text-xs text-gray-400">Panorama (.hdr / .jpg / .png / .webp)</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -370,7 +370,7 @@ export default function LightsPanel() {
                     <span>Yükle</span>
                     <input
                       type="file"
-                      accept=".hdr,.exr,.jpg,.jpeg,.png"
+                      accept=".hdr,.exr,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0]

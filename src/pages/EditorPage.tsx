@@ -24,6 +24,7 @@ import ViewerPreviewModal from '@/components/ui/ViewerPreviewModal'
 import { exportProjectAsZip } from '@/utils/zipExporter'
 import { toast } from '@/store/useToastStore'
 import HotspotRenderer from '@/components/canvas/HotspotRenderer'
+import HdriSphere from '@/components/canvas/HdriSphere'
 import { FPSCounter } from '@/components/ui/FPSCounter'
 
 // Editor Camera Initializer - Sets camera to saved orbit position on load
@@ -278,13 +279,24 @@ export default function EditorPage() {
           {environment.hdriPreset !== 'custom' ? (
             <Environment
               preset={environment.hdriPreset || 'apartment'}
-              background={environment.showBackground || false}
+              background={environment.showBackground && environment.backgroundType !== 'sphere' || false}
             />
           ) : environment.customHdriUrl ? (
-            <Environment
-              files={environment.customHdriUrl}
-              background={environment.showBackground || false}
-            />
+            <>
+              <Environment
+                files={environment.customHdriUrl}
+                background={environment.showBackground && environment.backgroundType !== 'sphere' || false}
+              />
+              {/* HDRI Sphere Mode */}
+              {environment.backgroundType === 'sphere' && (
+                <HdriSphere
+                  url={environment.customHdriUrl}
+                  position={environment.spherePosition || [0, 0, 0]}
+                  scale={environment.sphereScale || 100}
+                  rotation={environment.sphereRotation || 0}
+                />
+              )}
+            </>
           ) : (
             <Environment
               preset="apartment"
