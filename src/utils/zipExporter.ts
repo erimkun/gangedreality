@@ -27,8 +27,9 @@ export async function exportProjectAsZip(
   const { onProgress } = options
   log('Starting export', { projectId: projectData.project.projectId, options })
   onProgress?.(0, 'Dışa aktarma başlıyor...')
+  const exportData = JSON.parse(JSON.stringify(projectData)) as FullProjectData
 
-  const zip = new JSZip()
+  const projectId = exportData.project.projectId
   const projectId = projectData.project.projectId
 
   // Create folder structure
@@ -70,51 +71,43 @@ export async function exportProjectAsZip(
       }
     }
   }
-
+  zip.file('project.json', JSON.stringify(exportData.project, null, 2))
   zip.file('interactions.json', JSON.stringify(interactionsClone, null, 2))
   zip.file('project.json', JSON.stringify(projectData.project, null, 2))
   // zip.file('scene.json', JSON.stringify(projectData.scene, null, 2)) // Already saved with custom handling below
 
   // Process variants to replace Blob URLs with relative paths
   const variantsClone = JSON.parse(JSON.stringify(projectData.variants))
-
-  if (win.__blobUrlToFileName) {
-    variantsClone.configurableGroups.forEach((group: any) => {
-      group.options.forEach((option: any) => {
-        if (option.textureUrl && win.__blobUrlToFileName?.has(option.textureUrl)) {
-          option.textureUrl = win.__blobUrlToFileName.get(option.textureUrl)
-        }
-        if (option.normalMapUrl && win.__blobUrlToFileName?.has(option.normalMapUrl)) {
-          option.normalMapUrl = win.__blobUrlToFileName.get(option.normalMapUrl)
-        }
-        if (option.roughnessMapUrl && win.__blobUrlToFileName?.has(option.roughnessMapUrl)) {
-          option.roughnessMapUrl = win.__blobUrlToFileName.get(option.roughnessMapUrl)
-        }
-      })
-    })
+  const resolveAssetUrl = (url?: string) => {
+    if (!url) return url
+    if (win.__blobUrlToFileName?.has(url)) return win.__blobUrlToFileName.get(url)
+    if (win.__dataUrlToFileName?.has(url)) return win.__dataUrlToFileName.get(url)
+    return url
   }
+
+  variantsClone.configurableGroups.forEach((group: any) => {
+    group.options.forEach((option: any) => {
+      option.textureUrl = resolveAssetUrl(option.textureUrl)
+      option.normalMapUrl = resolveAssetUrl(option.normalMapUrl)
+      option.roughnessMapUrl = resolveAssetUrl(option.roughnessMapUrl)
+    })
+  })
 
   // Process Scene Environment HDRI (Custom)
   const sceneClone = JSON.parse(JSON.stringify(projectData.scene))
   if (sceneClone.environment && sceneClone.environment.customHdriUrl) {
-    if (win.__blobUrlToFileName?.has(sceneClone.environment.customHdriUrl)) {
-      sceneClone.environment.customHdriUrl = win.__blobUrlToFileName.get(sceneClone.environment.customHdriUrl)
-    }
+    sceneClone.environment.customHdriUrl = resolveAssetUrl(sceneClone.environment.customHdriUrl)
   }
 
   // Process Hotspots Icons
   const hotspotsClone = JSON.parse(JSON.stringify(projectData.hotspots))
   if (hotspotsClone.nodes) {
     hotspotsClone.nodes.forEach((node: any) => {
-      if (node.customIconUrl && win.__blobUrlToFileName?.has(node.customIconUrl)) {
-        node.customIconUrl = win.__blobUrlToFileName.get(node.customIconUrl)
-      }
+      node.customIconUrl = resolveAssetUrl(node.customIconUrl)
     })
   }
   if (hotspotsClone.settings && hotspotsClone.settings.defaultCustomIconUrl) {
-    if (win.__blobUrlToFileName?.has(hotspotsClone.settings.defaultCustomIconUrl)) {
-      hotspotsClone.settings.defaultCustomIconUrl = win.__blobUrlToFileName.get(hotspotsClone.settings.defaultCustomIconUrl)
-    }
+    hotspotsClone.settings.defaultCustomIconUrl = resolveAssetUrl(hotspotsClone.settings.defaultCustomIconUrl)
   }
 
   zip.file('variants.json', JSON.stringify(variantsClone, null, 2))
@@ -131,7 +124,7 @@ export async function exportProjectAsZip(
     onProgress?.(30, 'Model dosyası ekleniyor...')
     const arrayBuffer = await modelFile.arrayBuffer()
     modelFolder.file(modelFile.name, arrayBuffer)
-
+    exportData.project.assets.mainModel = `model/${modelFile.name}`
     // Update project.json with correct model path
     projectData.project.assets.mainModel = `model/${modelFile.name}`
 
@@ -146,7 +139,7 @@ export async function exportProjectAsZip(
           model.url = `model/${modelFile.name}`
         }
       })
-    }
+    zip.file('project.json', JSON.stringify(exportData.project, null, 2))
 
     zip.file('project.json', JSON.stringify(projectData.project, null, 2))
   } else {
@@ -169,21 +162,12 @@ export async function exportProjectAsZip(
 
 Bu proje Ganged Reality 3D CMS ile oluşturulmuştur.
 
-## Dosya Yapısı
-
-- \`project.json\` - Genel proje ayarları
-- \`scene.json\` - Sahne ve ışık ayarları
-- \`interactions.json\` - Etkileşim noktaları
-- \`variants.json\` - Materyal varyasyonları
-- \`hotspots.json\` - Navigasyon noktaları
 - \`model/\` - 3D model dosyaları
 - \`textures/\` - Texture ve HDRi dosyaları
 
 ## Kurulum
 
 Bu ZIP'in içeriğini \`public/data/${projectId}/\` klasörüne çıkartın.
-Sonra tarayıcıda \`/${projectId}\` adresine gidin.
-
 Proje ID: ${projectId}
 Versiyon: ${projectData.project.version}
 `

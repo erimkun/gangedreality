@@ -22,6 +22,16 @@ const log = (action: string, data?: unknown) => {
 // Generate unique ID
 const generateId = () => `model_${Math.random().toString(36).substring(2, 11)}`
 
+const resetGlobalAssetMaps = () => {
+  const win = window as any
+  win.__loadedModelFile = undefined
+  win.__loadedModelFiles = []
+  win.__loadedTextures = new Map()
+  win.__blobUrlToFileName = new Map()
+  win.__dataUrlToFileName = new Map()
+  win.__interactionFiles = new Map()
+}
+
 interface ProjectState {
   // Project Meta
   projectId: string | null
@@ -74,6 +84,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     log('loadProject', { projectId })
     set({ isLoading: true, error: null })
 
+    resetGlobalAssetMaps()
+
     try {
       // Try to fetch project.json from the data folder
       const response = await fetch(`/data/${projectId}/project.json`)
@@ -91,6 +103,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
       const projectData: ProjectConfig = await response.json()
       log('loadProject', { projectData })
+
+      const defaultData = createDefaultProject(projectId, projectData.projectName)
 
       // Load other config files
       const [sceneRes, interactionsRes, variantsRes, hotspotsRes] = await Promise.all([
@@ -163,6 +177,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
 
         useSceneStore.getState().loadFromConfig(sceneData)
+      } else {
+        useSceneStore.getState().loadFromConfig(defaultData.scene)
       }
 
       // Update interactions store if interactions.json exists
@@ -189,6 +205,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
 
         useInteractionsStore.getState().loadFromConfig(interactionsData)
+      } else {
+        useInteractionsStore.getState().loadFromConfig(defaultData.interactions)
       }
 
       // Update variants store if variants.json exists
@@ -217,6 +235,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
 
         useVariantsStore.getState().loadFromConfig(variantsData)
+      } else {
+        useVariantsStore.getState().loadFromConfig(defaultData.variants)
       }
 
       // Update hotspots store if hotspots.json exists
@@ -252,7 +272,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           useHotspotStore.getState().updateSettings(hotspotsData.settings || {})
         } catch (e) {
           console.warn('Failed to parse hotspots.json', e)
+          useHotspotStore.getState().loadFromConfig(defaultData.hotspots)
         }
+      } else {
+        useHotspotStore.getState().loadFromConfig(defaultData.hotspots)
       }
 
       return true
@@ -271,6 +294,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   // Create new project with default values
   createNewProject: (projectId: string, projectName: string) => {
     const defaultData = createDefaultProject(projectId, projectName)
+
+    resetGlobalAssetMaps()
 
     set({
       projectId: defaultData.project.projectId,
@@ -394,6 +419,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   resetProject: () => {
+    resetGlobalAssetMaps()
     set({
       projectId: null,
       projectName: defaultProjectConfig.projectName,

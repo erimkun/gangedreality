@@ -5,6 +5,88 @@ interface BlockRendererProps {
     className?: string
 }
 
+const SVG_ALLOWED_TAGS = new Set([
+    'svg',
+    'g',
+    'path',
+    'circle',
+    'rect',
+    'line',
+    'polyline',
+    'polygon'
+])
+
+const SVG_ALLOWED_ATTRS = new Set([
+    'width',
+    'height',
+    'viewbox',
+    'fill',
+    'stroke',
+    'stroke-width',
+    'stroke-linecap',
+    'stroke-linejoin',
+    'd',
+    'points',
+    'cx',
+    'cy',
+    'r',
+    'x',
+    'y',
+    'rx',
+    'ry',
+    'transform',
+    'opacity',
+    'fill-rule',
+    'clip-rule',
+    'stroke-miterlimit',
+    'stroke-dasharray',
+    'stroke-dashoffset',
+    'stroke-opacity',
+    'fill-opacity',
+    'xmlns'
+])
+
+const isProbablySvgMarkup = (value: string) => /<svg[\s>]/i.test(value)
+
+const sanitizeSvgMarkup = (value: string) => {
+    if (typeof window === 'undefined') return null
+    if (!isProbablySvgMarkup(value)) return null
+
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(value, 'image/svg+xml')
+    if (doc.getElementsByTagName('parsererror').length > 0) return null
+
+    const svg = doc.documentElement
+    if (!svg || svg.tagName.toLowerCase() !== 'svg') return null
+
+    const sanitizeElement = (element: Element) => {
+        const children = Array.from(element.children)
+        for (const child of children) {
+            const tagName = child.tagName.toLowerCase()
+            if (!SVG_ALLOWED_TAGS.has(tagName)) {
+                child.remove()
+                continue
+            }
+            sanitizeElement(child)
+        }
+
+        for (const attr of Array.from(element.attributes)) {
+            const name = attr.name.toLowerCase()
+            if (name.startsWith('on') || !SVG_ALLOWED_ATTRS.has(name)) {
+                element.removeAttribute(attr.name)
+                continue
+            }
+            if ((name === 'href' || name === 'xlink:href') && /javascript:/i.test(attr.value)) {
+                element.removeAttribute(attr.name)
+            }
+        }
+    }
+
+    sanitizeElement(svg)
+
+    return new XMLSerializer().serializeToString(svg)
+}
+
 export default function BlockRenderer({ blocks, className = '' }: BlockRendererProps) {
     if (!blocks || blocks.length === 0) return null
 
@@ -49,9 +131,14 @@ export default function BlockRenderer({ blocks, className = '' }: BlockRendererP
                                     {/* Icon/Bullet rendering */}
                                     <div className="mt-1 shrink-0" style={{ color: block.settings.iconColor || 'inherit' }}>
                                         {block.settings.listStyle === 'icon' && block.settings.icon ? (
-                                            // If SVG content is provided directly (advanced) or just a keyword
-                                            // For now assuming simple text emoji or handling custom SVG later if needed
-                                            <span dangerouslySetInnerHTML={{ __html: block.settings.icon }} />
+                                            (() => {
+                                                const safeSvg = sanitizeSvgMarkup(block.settings.icon)
+                                                return safeSvg ? (
+                                                    <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: safeSvg }} />
+                                                ) : (
+                                                    <span className="text-sm">{block.settings.icon}</span>
+                                                )
+                                            })()
                                         ) : block.settings.listStyle === 'number' ? (
                                             <span className="font-bold opacity-80">{i + 1}.</span>
                                         ) : (
@@ -85,10 +172,20 @@ export default function BlockRenderer({ blocks, className = '' }: BlockRendererP
                                 color: block.settings.iconColor || 'inherit'
                             }}
                         >
-                            <div
-                                style={{ fontSize: block.settings.iconSize || 24, display: 'inline-block' }}
-                                dangerouslySetInnerHTML={{ __html: block.settings.icon }}
-                            />
+                            {(() => {
+                                const safeSvg = sanitizeSvgMarkup(block.settings.icon)
+                                return safeSvg ? (
+                                    <div
+                                        style={{ fontSize: block.settings.iconSize || 24, display: 'inline-block' }}
+                                        aria-hidden="true"
+                                        dangerouslySetInnerHTML={{ __html: safeSvg }}
+                                    />
+                                ) : (
+                                    <span style={{ fontSize: block.settings.iconSize || 24, display: 'inline-block' }}>
+                                        {block.settings.icon}
+                                    </span>
+                                )
+                            })()}
                         </div>
                     )}
                 </div>
