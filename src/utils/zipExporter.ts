@@ -3,7 +3,7 @@ import { saveAs } from 'file-saver'
 import { FullProjectData } from '@/types'
 
 // Debug logger
-const DEBUG = true
+const DEBUG = false
 const log = (message: string, data?: unknown) => {
   if (DEBUG) {
     console.log(`[ZipExporter]`, message, data !== undefined ? data : '')
@@ -19,6 +19,8 @@ interface ExportOptions {
 /**
  * Exports the current project as a ZIP file
  * Creates the folder structure defined in Project.md
+ *
+ * IMPORTANT: Only the deep-cloned `exportData` is modified — `projectData` (live store state) is never mutated.
  */
 export async function exportProjectAsZip(
   projectData: FullProjectData,
@@ -27,10 +29,13 @@ export async function exportProjectAsZip(
   const { onProgress } = options
   log('Starting export', { projectId: projectData.project.projectId, options })
   onProgress?.(0, 'Dışa aktarma başlıyor...')
-  const exportData = JSON.parse(JSON.stringify(projectData)) as FullProjectData
 
+  // Deep clone so we never mutate live store state
+  const exportData = JSON.parse(JSON.stringify(projectData)) as FullProjectData
   const projectId = exportData.project.projectId
-  const projectId = projectData.project.projectId
+
+  // Create ZIP instance
+  const zip = new JSZip()
 
   // Create folder structure
   // JSON files go to root, model and textures in subfolders
@@ -43,15 +48,21 @@ export async function exportProjectAsZip(
     throw new Error('ZIP klasör yapısı oluşturulamadı')
   }
 
-  // Add JSON config files to root (not in data/ subfolder)
-  // This matches the expected structure: /data/{projectId}/project.json
   log('Adding JSON config files')
   onProgress?.(10, 'Konfigürasyon dosyaları ekleniyor...')
 
-  // Process interactions to safe interactions images
-  const interactionsClone = JSON.parse(JSON.stringify(projectData.interactions))
   const win = window as any
 
+  // Helper: resolve blob/data URLs to relative file names
+  const resolveAssetUrl = (url?: string) => {
+    if (!url) return url
+    if (win.__blobUrlToFileName?.has(url)) return win.__blobUrlToFileName.get(url)
+    if (win.__dataUrlToFileName?.has(url)) return win.__dataUrlToFileName.get(url)
+    return url
+  }
+
+  // --- Process interactions (embed blob images into textures/) ---
+  const interactionsClone = exportData.interactions
   if (win.__interactionFiles && interactionsClone.zones) {
     for (const zone of interactionsClone.zones) {
       if (zone.popup?.blocks) {
@@ -60,10 +71,14 @@ export async function exportProjectAsZip(
             if (win.__interactionFiles.has(block.content)) {
               const file = win.__interactionFiles.get(block.content)
               if (file) {
-                const fileName = `int_${zone.id}_${block.id}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-                const arrayBuffer = await file.arrayBuffer()
-                texturesFolder?.file(fileName, arrayBuffer)
-                block.content = `textures/${fileName}`
+                try {
+                  const fileName = `int_${zone.id}_${block.id}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+                  const arrayBuffer = await file.arrayBuffer()
+                  texturesFolder.file(fileName, arrayBuffer)
+                  block.content = `textures/${fileName}`
+                } catch (err) {
+                  log('ERROR: Failed to read interaction image file', err)
+                }
               }
             }
           }
@@ -71,20 +86,9 @@ export async function exportProjectAsZip(
       }
     }
   }
-  zip.file('project.json', JSON.stringify(exportData.project, null, 2))
-  zip.file('interactions.json', JSON.stringify(interactionsClone, null, 2))
-  zip.file('project.json', JSON.stringify(projectData.project, null, 2))
-  // zip.file('scene.json', JSON.stringify(projectData.scene, null, 2)) // Already saved with custom handling below
 
-  // Process variants to replace Blob URLs with relative paths
-  const variantsClone = JSON.parse(JSON.stringify(projectData.variants))
-  const resolveAssetUrl = (url?: string) => {
-    if (!url) return url
-    if (win.__blobUrlToFileName?.has(url)) return win.__blobUrlToFileName.get(url)
-    if (win.__dataUrlToFileName?.has(url)) return win.__dataUrlToFileName.get(url)
-    return url
-  }
-
+  // --- Process variants: replace Blob URLs with relative paths ---
+  const variantsClone = exportData.variants
   variantsClone.configurableGroups.forEach((group: any) => {
     group.options.forEach((option: any) => {
       option.textureUrl = resolveAssetUrl(option.textureUrl)
@@ -93,14 +97,14 @@ export async function exportProjectAsZip(
     })
   })
 
-  // Process Scene Environment HDRI (Custom)
-  const sceneClone = JSON.parse(JSON.stringify(projectData.scene))
+  // --- Process Scene Environment HDRI ---
+  const sceneClone = exportData.scene
   if (sceneClone.environment && sceneClone.environment.customHdriUrl) {
     sceneClone.environment.customHdriUrl = resolveAssetUrl(sceneClone.environment.customHdriUrl)
   }
 
-  // Process Hotspots Icons
-  const hotspotsClone = JSON.parse(JSON.stringify(projectData.hotspots))
+  // --- Process Hotspots Icons ---
+  const hotspotsClone = exportData.hotspots
   if (hotspotsClone.nodes) {
     hotspotsClone.nodes.forEach((node: any) => {
       node.customIconUrl = resolveAssetUrl(node.customIconUrl)
@@ -110,55 +114,59 @@ export async function exportProjectAsZip(
     hotspotsClone.settings.defaultCustomIconUrl = resolveAssetUrl(hotspotsClone.settings.defaultCustomIconUrl)
   }
 
-  zip.file('variants.json', JSON.stringify(variantsClone, null, 2))
-  zip.file('hotspots.json', JSON.stringify(hotspotsClone, null, 2))
-  zip.file('scene.json', JSON.stringify(sceneClone, null, 2))
-
-  // Add model file if available
-  // Check both single file (legacy/import) and array (new upload)
-  const modelFileToExport = window.__loadedModelFile || (window.__loadedModelFiles && window.__loadedModelFiles.length > 0 ? window.__loadedModelFiles[0] : null)
+  // --- Add model file if available ---
+  const modelFileToExport = win.__loadedModelFile || (win.__loadedModelFiles && win.__loadedModelFiles.length > 0 ? win.__loadedModelFiles[0] : null)
 
   if (options.includeModel && modelFileToExport) {
     const modelFile = modelFileToExport
     log('Adding model file', { name: modelFile.name, size: modelFile.size })
     onProgress?.(30, 'Model dosyası ekleniyor...')
-    const arrayBuffer = await modelFile.arrayBuffer()
-    modelFolder.file(modelFile.name, arrayBuffer)
-    exportData.project.assets.mainModel = `model/${modelFile.name}`
-    // Update project.json with correct model path
-    projectData.project.assets.mainModel = `model/${modelFile.name}`
+    try {
+      const arrayBuffer = await modelFile.arrayBuffer()
+      modelFolder.file(modelFile.name, arrayBuffer)
+    } catch (err) {
+      log('ERROR: Failed to read model file', err)
+      throw new Error(`Model dosyası okunamadı: ${modelFile.name}`)
+    }
 
-    // Also update any model in the models array that matches the blob URL
-    if (projectData.project.assets.models) {
-      projectData.project.assets.models.forEach(model => {
-        // If the model URL is a blob URL, we assume it's the one we just exported
-        // or check if we can map it
+    // Update paths on the clone only
+    exportData.project.assets.mainModel = `model/${modelFile.name}`
+
+    if (exportData.project.assets.models) {
+      exportData.project.assets.models.forEach(model => {
         if (model.url && model.url.startsWith('blob:')) {
-          // For now, if we are exporting a single model file, we assume all blob models point to it
-          // Or ideally we should have a map, but the current system seems to assume single main model export
           model.url = `model/${modelFile.name}`
         }
       })
-    zip.file('project.json', JSON.stringify(exportData.project, null, 2))
-
-    zip.file('project.json', JSON.stringify(projectData.project, null, 2))
+    }
   } else {
     log('No model file to include', { includeModel: options.includeModel, hasFile: !!modelFileToExport })
   }
 
-  // Add texture files if available
-  if (options.includeTextures && window.__loadedTextures) {
-    log('Adding texture files', { count: window.__loadedTextures.size })
+  // --- Add texture files ---
+  if (options.includeTextures && win.__loadedTextures) {
+    log('Adding texture files', { count: win.__loadedTextures.size })
     onProgress?.(50, 'Texture dosyaları ekleniyor...')
-    for (const [filename, file] of window.__loadedTextures.entries()) {
+    for (const [filename, file] of win.__loadedTextures.entries()) {
       log('Adding texture', { filename })
-      const arrayBuffer = await file.arrayBuffer()
-      texturesFolder.file(filename, arrayBuffer)
+      try {
+        const arrayBuffer = await file.arrayBuffer()
+        texturesFolder.file(filename, arrayBuffer)
+      } catch (err) {
+        log('ERROR: Failed to read texture file', { filename, err })
+      }
     }
   }
 
-  // Add a README file
-  const readmeContent = `# ${projectData.project.projectName}
+  // --- Write all JSON config files (single write, after all processing) ---
+  zip.file('project.json', JSON.stringify(exportData.project, null, 2))
+  zip.file('interactions.json', JSON.stringify(interactionsClone, null, 2))
+  zip.file('variants.json', JSON.stringify(variantsClone, null, 2))
+  zip.file('hotspots.json', JSON.stringify(hotspotsClone, null, 2))
+  zip.file('scene.json', JSON.stringify(sceneClone, null, 2))
+
+  // --- Add README ---
+  const readmeContent = `# ${exportData.project.projectName}
 
 Bu proje Ganged Reality 3D CMS ile oluşturulmuştur.
 
@@ -169,12 +177,12 @@ Bu proje Ganged Reality 3D CMS ile oluşturulmuştur.
 
 Bu ZIP'in içeriğini \`public/data/${projectId}/\` klasörüne çıkartın.
 Proje ID: ${projectId}
-Versiyon: ${projectData.project.version}
+Versiyon: ${exportData.project.version}
 `
 
   zip.file('README.md', readmeContent)
 
-  // Generate and download ZIP
+  // --- Generate and download ZIP ---
   log('Generating ZIP file')
   onProgress?.(70, 'ZIP dosyası oluşturuluyor...')
   const content = await zip.generateAsync({
