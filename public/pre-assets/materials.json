@@ -7,8 +7,8 @@
       "color": "#8B4513",
       "metalness": 0,
       "roughness": 0.6,
-      "textureUrl": "/pre-assets/textures/wood-diffuse.jpg",
-      "normalMapUrl": "/pre-assets/textures/wood-normal.jpg"
+      "textureUrl": "/pre-assets/textures/134_Beech fine wood PBR texture-seamless.jpg",
+      "thumbnail": "/pre-assets/textures/134_Beech fine wood PBR texture-seamless.jpg"
     },
     {
       "id": "scanned-101-concrete-bare-clean-texture-seamless",

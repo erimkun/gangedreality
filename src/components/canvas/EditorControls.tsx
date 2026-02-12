@@ -532,9 +532,21 @@ export default function EditorControls() {
   }, [gl, controls, isMultiSelect, handleMultiTransformChange, selectedObject, selectedObjectId, getObjectType, updateLight, updateZone, pushAction])
   
   if (selectedObjects.length === 0) return null
+
+  // Helper: check if an object is still part of the scene graph
+  const isInScene = (obj: THREE.Object3D): boolean => {
+    let current: THREE.Object3D | null = obj
+    while (current) {
+      if (current === scene) return true
+      current = current.parent
+    }
+    return false
+  }
   
   // Multi-select: use TransformControls on the group
   if (isMultiSelect && multiSelectGroup) {
+    // Verify the group is still in the scene
+    if (!isInScene(multiSelectGroup)) return null
     return (
       <TransformControls
         ref={transformRef}
@@ -552,6 +564,8 @@ export default function EditorControls() {
   
   // Single select: use TransformControls
   if (!isMultiSelect && selectedObject) {
+    // Verify the selected object is still in the scene graph
+    if (!isInScene(selectedObject)) return null
     return (
       <TransformControls
         ref={transformRef}

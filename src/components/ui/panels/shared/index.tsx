@@ -35,6 +35,7 @@ export function DraggableNumberInput({
   })
   const [localValue, setLocalValue] = useState(value.toFixed(precision))
   const [isDragging, setIsDragging] = useState(false)
+  const isEditingRef = useRef(false) // Track if user is actively typing
   
   const colorClasses = {
     red: 'border-red-500 hover:border-red-400',
@@ -99,10 +100,16 @@ export function DraggableNumberInput({
   }, [value, onChange, step, precision])
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    isEditingRef.current = true
     setLocalValue(e.target.value)
   }
   
+  const handleInputFocus = () => {
+    isEditingRef.current = true
+  }
+
   const handleInputBlur = () => {
+    isEditingRef.current = false
     const parsed = parseFloat(localValue)
     if (!isNaN(parsed)) {
       onChange?.(parsed)
@@ -113,23 +120,23 @@ export function DraggableNumberInput({
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleInputBlur()
+      // Just blur — handleInputBlur will commit the value
       inputRef.current?.blur()
     } else if (e.key === 'Escape') {
+      // Reset to original value, then blur (handleInputBlur will re-commit the reset value)
+      isEditingRef.current = false
       setLocalValue(value.toFixed(precision))
       inputRef.current?.blur()
     }
   }
   
-  // Sync with external value changes
+  // Sync with external value changes (e.g. drag from gizmo, undo/redo)
+  // Only sync when NOT actively editing via keyboard
   useEffect(() => {
-    if (!isDragging) {
-      const parsedLocal = parseFloat(localValue)
-      if (isNaN(parsedLocal) || Math.abs(value - parsedLocal) > 0.001) {
-        setLocalValue(value.toFixed(precision))
-      }
+    if (!isDragging && !isEditingRef.current) {
+      setLocalValue(value.toFixed(precision))
     }
-  }, [value, isDragging, precision, localValue])
+  }, [value, isDragging, precision])
   
   return (
     <div>
@@ -145,6 +152,7 @@ export function DraggableNumberInput({
         type="text"
         value={localValue}
         onChange={handleInputChange}
+        onFocus={handleInputFocus}
         onBlur={handleInputBlur}
         onKeyDown={handleKeyDown}
         className={`w-full bg-editor-panel border-l-2 ${colorClasses[color]} rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-editor-highlight cursor-ew-resize transition-colors ${isDragging ? 'ring-2 ring-blue-400' : ''}`}

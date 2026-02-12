@@ -1,6 +1,5 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import * as THREE from 'three'
-import { useLoader } from '@react-three/fiber'
 import { RGBELoader } from 'three-stdlib'
 
 interface HdriSphereProps {
@@ -12,23 +11,64 @@ interface HdriSphereProps {
 
 function HdriSphere({ url, position, scale, rotation }: HdriSphereProps) {
     const meshRef = useRef<THREE.Mesh>(null)
+    const [texture, setTexture] = useState<THREE.Texture | null>(null)
 
-    // Determine loader based on extension (simple check)
+    // Determine loader based on extension
     const isHdr = url.toLowerCase().includes('.hdr') || url.toLowerCase().includes('.exr')
-    const loader = isHdr ? RGBELoader : THREE.TextureLoader
 
-    // Load texture
-    const texture = useLoader(loader as any, url) as THREE.Texture
+    // Load texture manually instead of useLoader to avoid shared-cache mutation issues
+    useEffect(() => {
+        let disposed = false
+        let loadedTexRef: THREE.Texture | null = null
 
-    useMemo(() => {
-        if (texture) {
-            texture.mapping = THREE.EquirectangularReflectionMapping
-            // If using TextureLoader for standard images, we might want sRGB encoding
+        // Clear previous texture while loading new one
+        setTexture(prev => {
+            if (prev) prev.dispose()
+            return null
+        })
+
+        const onLoad = (loadedTex: THREE.Texture) => {
+            if (disposed) {
+                loadedTex.dispose()
+                return
+            }
+            // Clone so we never mutate a cached/shared texture
+            const cloned = loadedTex.clone()
+            cloned.needsUpdate = true
+            // Copy image data which .clone() doesn't deep-copy 
+            cloned.image = loadedTex.image
+            cloned.source = loadedTex.source
+
+            cloned.mapping = THREE.EquirectangularReflectionMapping
+
             if (!isHdr) {
-                texture.colorSpace = THREE.SRGBColorSpace
+                try { cloned.colorSpace = THREE.SRGBColorSpace } catch { /* read-only in some DataTexture variants */ }
+            }
+
+            loadedTexRef = cloned
+            setTexture(cloned)
+        }
+
+        const onError = (err: unknown) => {
+            console.error('[HdriSphere] Failed to load texture:', err)
+        }
+
+        if (isHdr) {
+            new RGBELoader().load(url, onLoad, undefined, onError)
+        } else {
+            new THREE.TextureLoader().load(url, onLoad, undefined, onError)
+        }
+
+        return () => {
+            disposed = true
+            if (loadedTexRef) {
+                loadedTexRef.dispose()
+                loadedTexRef = null
             }
         }
-    }, [texture, isHdr])
+    }, [url, isHdr])
+
+    if (!texture) return null
 
     return (
         <group position={position} rotation={[0, rotation || 0, 0]} scale={[scale, scale, scale]}>
@@ -37,7 +77,7 @@ function HdriSphere({ url, position, scale, rotation }: HdriSphereProps) {
                 <meshBasicMaterial
                     map={texture}
                     side={THREE.BackSide}
-                    toneMapped={false} // HDRIs usually shouldn't be tone mapped twice if Environment handles it, but here we render raw
+                    toneMapped={false}
                 />
             </mesh>
         </group>

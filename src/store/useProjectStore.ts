@@ -90,7 +90,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // Try to fetch project.json from the data folder
       const response = await fetch(`/data/${projectId}/project.json`)
 
-      if (!response.ok) {
+      // Check both status and content-type — SPA fallback may return index.html with 200
+      const contentType = response.headers.get('content-type') || ''
+      if (!response.ok || !contentType.includes('application/json')) {
         log('loadProject', 'Project not found, creating new')
         // Project doesn't exist
         set({

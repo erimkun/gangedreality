@@ -877,6 +877,12 @@ function OptionButton({ option, isSelected, onSelect, onDelete, onEdit, adjustBr
             src={option.textureUrl} 
             alt={option.name} 
             className="w-full h-full object-cover"
+            onError={(e) => {
+              // Show placeholder color when texture thumbnail fails to load
+              const target = e.currentTarget
+              target.style.display = 'none'
+              target.parentElement!.style.background = '#4a3f35'
+            }}
           />
         )}
         {/* Selected indicator */}
@@ -1460,6 +1466,12 @@ function TextureAddForm({
                   src={asset.thumbnail || asset.textureUrl} 
                   alt={asset.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.currentTarget
+                    target.style.display = 'none'
+                    target.parentElement!.style.background = '#4a3f35'
+                    target.parentElement!.title = `${asset.name} (görsel yüklenemedi)`
+                  }}
                 />
               </button>
             ))}

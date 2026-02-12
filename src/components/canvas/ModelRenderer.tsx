@@ -368,9 +368,9 @@ function LoadedModel({
                   // Flip Y for proper orientation (common for uploaded textures)
                   tex.flipY = true
                   
-                  // Set color space
+                  // Set color space (try-catch: some DataTexture types have read-only colorSpace)
                   if (isSRGB) {
-                    tex.colorSpace = THREE.SRGBColorSpace
+                    try { tex.colorSpace = THREE.SRGBColorSpace } catch { /* read-only */ }
                   }
                   
                   // Generate mipmaps for better quality
@@ -409,7 +409,7 @@ function LoadedModel({
                     selectedOption.normalMapUrl, 
                     (normalMap) => {
                       applyTextureSettings(normalMap, false) // Linear for normal maps
-                      normalMap.colorSpace = THREE.NoColorSpace
+                      try { normalMap.colorSpace = THREE.NoColorSpace } catch { /* read-only */ }
                       stdMat.normalMap = normalMap
                       stdMat.needsUpdate = true
                       log('LoadedModel', `✓ Normal map loaded for ${child.name}`)
@@ -425,7 +425,7 @@ function LoadedModel({
                     selectedOption.roughnessMapUrl, 
                     (roughnessMap) => {
                       applyTextureSettings(roughnessMap, false) // Linear for roughness maps
-                      roughnessMap.colorSpace = THREE.NoColorSpace
+                      try { roughnessMap.colorSpace = THREE.NoColorSpace } catch { /* read-only */ }
                       stdMat.roughnessMap = roughnessMap
                       stdMat.needsUpdate = true
                       log('LoadedModel', `✓ Roughness map loaded for ${child.name}`)
