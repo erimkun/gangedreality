@@ -2,7 +2,7 @@
  * Properties Panel - Object transformation and selection management
  */
 
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useReducer } from 'react'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useVariantsStore } from '../../../store/useVariantsStore'
 import { useHotspotStore } from '../../../store/useHotspotStore'
@@ -24,6 +24,9 @@ export default function PropertiesPanel() {
   } = useEditorStore()
   const { createGroup } = useVariantsStore()
   const { settings: hotspotSettings, toggleWalkableMesh } = useHotspotStore()
+  
+  // Force re-render after direct Three.js mutation (must be before any early returns)
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
   
   const isMultiSelect = selectedObjects.length > 1
   
@@ -217,19 +220,19 @@ export default function PropertiesPanel() {
             label="X" 
             value={position.x} 
             color="red" 
-            onChange={(v) => { selectedObject!.position.x = v }}
+            onChange={(v) => { selectedObject!.position.x = v; forceUpdate() }}
           />
           <DraggableNumberInput 
             label="Y" 
             value={position.y} 
             color="green" 
-            onChange={(v) => { selectedObject!.position.y = v }}
+            onChange={(v) => { selectedObject!.position.y = v; forceUpdate() }}
           />
           <DraggableNumberInput 
             label="Z" 
             value={position.z} 
             color="blue" 
-            onChange={(v) => { selectedObject!.position.z = v }}
+            onChange={(v) => { selectedObject!.position.z = v; forceUpdate() }}
           />
         </div>
       </div>
@@ -243,21 +246,21 @@ export default function PropertiesPanel() {
             value={(rotation.x * 180 / Math.PI)} 
             color="red" 
             step={1}
-            onChange={(v) => { selectedObject!.rotation.x = v * Math.PI / 180 }}
+            onChange={(v) => { selectedObject!.rotation.x = v * Math.PI / 180; forceUpdate() }}
           />
           <DraggableNumberInput 
             label="Y" 
             value={(rotation.y * 180 / Math.PI)} 
             color="green" 
             step={1}
-            onChange={(v) => { selectedObject!.rotation.y = v * Math.PI / 180 }}
+            onChange={(v) => { selectedObject!.rotation.y = v * Math.PI / 180; forceUpdate() }}
           />
           <DraggableNumberInput 
             label="Z" 
             value={(rotation.z * 180 / Math.PI)} 
             color="blue" 
             step={1}
-            onChange={(v) => { selectedObject!.rotation.z = v * Math.PI / 180 }}
+            onChange={(v) => { selectedObject!.rotation.z = v * Math.PI / 180; forceUpdate() }}
           />
         </div>
       </div>
@@ -292,7 +295,7 @@ export default function PropertiesPanel() {
             color="red" 
             step={0.01}
             precision={3}
-            onChange={(v) => { selectedObject!.scale.x = Math.max(0.001, v) }}
+            onChange={(v) => { selectedObject!.scale.x = Math.max(0.001, v); forceUpdate() }}
           />
           <DraggableNumberInput 
             label="Y" 
@@ -300,7 +303,7 @@ export default function PropertiesPanel() {
             color="green" 
             step={0.01}
             precision={3}
-            onChange={(v) => { selectedObject!.scale.y = Math.max(0.001, v) }}
+            onChange={(v) => { selectedObject!.scale.y = Math.max(0.001, v); forceUpdate() }}
           />
           <DraggableNumberInput 
             label="Z" 
@@ -308,7 +311,7 @@ export default function PropertiesPanel() {
             color="blue" 
             step={0.01}
             precision={3}
-            onChange={(v) => { selectedObject!.scale.z = Math.max(0.001, v) }}
+            onChange={(v) => { selectedObject!.scale.z = Math.max(0.001, v); forceUpdate() }}
           />
         </div>
       </div>

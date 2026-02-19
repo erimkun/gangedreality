@@ -120,7 +120,7 @@ function InteractionZoneMesh({
       {/* Label */}
       {isEditor && (
         <Html
-          position={[0, radius + 0.3, 0]}
+          position={[0, 1 + 0.3 / radius, 0]}
           center
           distanceFactor={10}
           style={{ pointerEvents: 'none' }}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface NewProjectDialogProps {
   projectId: string
@@ -8,6 +8,16 @@ interface NewProjectDialogProps {
 
 export default function NewProjectDialog({ projectId, onConfirm, onCancel }: NewProjectDialogProps) {
   const [projectName, setProjectName] = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
+
+  // Escape key to cancel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -17,14 +27,14 @@ export default function NewProjectDialog({ projectId, onConfirm, onCancel }: New
   }
   
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-      <div className="bg-editor-panel rounded-2xl p-8 max-w-md w-full shadow-2xl border border-gray-700">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="new-project-title">
+      <div ref={dialogRef} className="bg-editor-panel rounded-2xl p-8 max-w-md w-full shadow-2xl border border-gray-700">
         {/* Icon */}
         <div className="text-center mb-6">
           <div className="w-20 h-20 bg-editor-accent rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-4xl">🏗️</span>
           </div>
-          <h2 className="text-2xl font-bold text-white">Proje Bulunamadı</h2>
+          <h2 id="new-project-title" className="text-2xl font-bold text-white">Proje Bulunamadı</h2>
           <p className="text-gray-400 mt-2">
             <code className="bg-editor-bg px-2 py-1 rounded text-editor-highlight">
               {projectId}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ViewerContent from '../ViewerContent'
 
 interface ViewerPreviewModalProps {
@@ -8,8 +8,17 @@ interface ViewerPreviewModalProps {
 export default function ViewerPreviewModal({ onClose }: ViewerPreviewModalProps) {
     const [mode, setMode] = useState<'mobile' | 'desktop'>('desktop')
 
+    // Escape key to close
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose()
+        }
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [onClose])
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 text-white" role="dialog" aria-modal="true" aria-label="Görüntüleyici Önizleme">
             
             {/* Mode Switcher */}
             <div className="absolute top-8 left-1/2 -translate-x-1/2 flex bg-white/10 rounded-full p-1 backdrop-blur-md border border-white/10 z-50">
@@ -68,6 +77,7 @@ export default function ViewerPreviewModal({ onClose }: ViewerPreviewModalProps)
                 onClick={onClose}
                 className="absolute top-8 right-8 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors z-50"
                 title="Simülasyonu Kapat"
+                aria-label="Simülasyonu Kapat"
             >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />

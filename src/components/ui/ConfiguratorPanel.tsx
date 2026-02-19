@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useVariantsStore } from '@/store/useVariantsStore'
 import { useSearchParams } from 'react-router-dom'
 
@@ -46,20 +46,21 @@ export default function ConfiguratorPanel({ isOpen = true, onToggle }: Configura
     }
   }, [])
 
-  // Initialize from URL params
+  // Initialize from URL params — must wait for groups to load
+  const appliedConfigRef = useRef(false)
   useEffect(() => {
     const configParam = searchParams.get('config')
-    if (configParam) {
-      try {
-        const selections = JSON.parse(atob(configParam)) as Record<string, number>
-        Object.entries(selections).forEach(([groupId, optionIndex]) => {
-          selectOption(groupId, optionIndex)
-        })
-      } catch (e) {
-        console.error('Failed to parse config from URL', e)
-      }
+    if (!configParam || visibleGroups.length === 0 || appliedConfigRef.current) return
+    try {
+      const selections = JSON.parse(decodeURIComponent(escape(atob(configParam)))) as Record<string, number>
+      Object.entries(selections).forEach(([groupId, optionIndex]) => {
+        selectOption(groupId, optionIndex)
+      })
+      appliedConfigRef.current = true
+    } catch (e) {
+      console.error('Failed to parse config from URL', e)
     }
-  }, []) // Only on mount
+  }, [visibleGroups.length, searchParams, selectOption])
 
   // Update URL when selection changes
   const handleSelectOption = (groupId: string, optionIndex: number) => {
@@ -75,8 +76,8 @@ export default function ConfiguratorPanel({ isOpen = true, onToggle }: Configura
       }
     })
     
-    // Update URL with base64 encoded config
-    const encoded = btoa(JSON.stringify(selections))
+    // Update URL with base64 encoded config (safe for Turkish characters)
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(selections))))
     setSearchParams(prev => {
       prev.set('config', encoded)
       return prev

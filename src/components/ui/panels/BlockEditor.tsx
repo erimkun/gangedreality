@@ -64,6 +64,12 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     }
 
     const handleImageUpload = (id: string, file: File) => {
+        // Revoke old blob URL if exists
+        const oldBlock = blocks.find(b => b.id === id)
+        if (oldBlock?.content && oldBlock.content.startsWith('blob:')) {
+            URL.revokeObjectURL(oldBlock.content)
+        }
+
         const url = URL.createObjectURL(file)
         
         // Store file reference globally for export

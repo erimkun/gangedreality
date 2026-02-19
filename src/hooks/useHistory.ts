@@ -94,26 +94,33 @@ export function useUndoable<T>(
   description: string
 ) {
   const previousValue = useRef<T | null>(null)
+  const hasStarted = useRef(false)
 
   const startChange = useCallback(() => {
     previousValue.current = getValue()
+    hasStarted.current = true
   }, [getValue])
 
   const endChange = useCallback(() => {
-    if (previousValue.current === null) return
+    if (!hasStarted.current) return
     
     const oldValue = previousValue.current
     const newValue = getValue()
     
     // Don't record if nothing changed
-    if (JSON.stringify(oldValue) === JSON.stringify(newValue)) return
+    if (JSON.stringify(oldValue) === JSON.stringify(newValue)) {
+      hasStarted.current = false
+      previousValue.current = null
+      return
+    }
 
     useHistoryStore.getState().pushAction({
       description,
-      undo: () => setValue(oldValue),
+      undo: () => setValue(oldValue as T),
       redo: () => setValue(newValue)
     })
 
+    hasStarted.current = false
     previousValue.current = null
   }, [getValue, setValue, description])
 

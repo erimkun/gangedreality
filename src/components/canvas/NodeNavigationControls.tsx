@@ -16,7 +16,7 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
   const { camera, raycaster, pointer, scene, gl } = useThree()
   const { nodes, settings } = useHotspotStore()
   const setIsNavigating = useNavigationStore(state => state.setIsNavigating)
-  const [cursorPosition, setCursorPosition] = useState(new THREE.Vector3(0, 0, 0))
+  const cursorPositionRef = useRef(new THREE.Vector3(0, 0, 0))
   const [isCursorVisible, setIsCursorVisible] = useState(false)
   const [isMoving, setIsMoving] = useState(false)
 
@@ -53,9 +53,10 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
       }
     }
 
-    // Cleanup navigation state on unmount
+    // Cleanup navigation state and GSAP tweens on unmount
     return () => {
       setIsNavigating(false)
+      gsap.killTweensOf(camera.position)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, startPosition, camera]) // Removed onPositionChange to prevent reset loop
@@ -159,7 +160,7 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
     }
 
     if (groundPoint) {
-      setCursorPosition(groundPoint)
+      cursorPositionRef.current.copy(groundPoint)
       setIsCursorVisible(true)
     } else {
       setIsCursorVisible(false)
@@ -175,8 +176,8 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
       const nodePos = new THREE.Vector3(...node.position)
       // Ignore Y for distance check (2D distance)
       const dist = Math.sqrt(
-        Math.pow(nodePos.x - cursorPosition.x, 2) +
-        Math.pow(nodePos.z - cursorPosition.z, 2)
+        Math.pow(nodePos.x - cursorPositionRef.current.x, 2) +
+        Math.pow(nodePos.z - cursorPositionRef.current.z, 2)
       )
 
       if (dist < minDistance) {
@@ -214,7 +215,7 @@ export default function NodeNavigationControls({ enabled, startPosition, onPosit
 
   return (
     <>
-      <GroundCursor position={cursorPosition} visible={isCursorVisible && !isMoving && !isDragging.current} />
+      <GroundCursor position={cursorPositionRef.current} visible={isCursorVisible && !isMoving && !isDragging.current} />
     </>
   )
 }

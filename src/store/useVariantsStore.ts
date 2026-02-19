@@ -5,8 +5,9 @@ import {
   VariantOption
 } from '@/types'
 import { useHistoryStore } from '@/hooks/useHistory'
+import { nanoid } from 'nanoid'
 
-const generateId = () => `group_${Math.random().toString(36).substring(2, 11)}`
+const generateId = () => `group_${nanoid(10)}`
 
 interface VariantsState {
   configurableGroups: ConfigurableGroup[]
@@ -225,18 +226,32 @@ export const useVariantsStore = create<VariantsState>((set, get) => ({
 
   removeOption: (groupId, optionIndex) => {
     set(state => ({
-      configurableGroups: state.configurableGroups.map(group =>
-        group.id === groupId
-          ? {
-              ...group,
-              options: group.options.filter((_, idx) => idx !== optionIndex),
-              selectedOptionIndex: 
-                group.selectedOptionIndex !== null && group.selectedOptionIndex >= optionIndex && group.selectedOptionIndex > 0
-                  ? group.selectedOptionIndex - 1
-                  : group.selectedOptionIndex
-            }
-          : group
-      )
+      configurableGroups: state.configurableGroups.map(group => {
+        if (group.id !== groupId) return group
+
+        const newOptions = group.options.filter((_, idx) => idx !== optionIndex)
+        let newSelectedIndex = group.selectedOptionIndex
+
+        if (newOptions.length === 0) {
+          // No options left → null
+          newSelectedIndex = null
+        } else if (newSelectedIndex !== null) {
+          if (newSelectedIndex === optionIndex) {
+            // Selected option was deleted → select previous or first
+            newSelectedIndex = optionIndex > 0 ? optionIndex - 1 : 0
+          } else if (newSelectedIndex > optionIndex) {
+            // Selected option is after deleted → shift index down
+            newSelectedIndex = newSelectedIndex - 1
+          }
+          // else: selected is before deleted → no change needed
+        }
+
+        return {
+          ...group,
+          options: newOptions,
+          selectedOptionIndex: newSelectedIndex
+        }
+      })
     }))
   },
 

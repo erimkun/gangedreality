@@ -8,9 +8,12 @@ import {
   EffectsConfig,
   defaultSceneConfig
 } from '../types'
+import { useHistoryStore } from '@/hooks/useHistory'
 
-// Generate simple UUID without external library
-const generateId = () => Math.random().toString(36).substring(2, 11)
+import { nanoid } from 'nanoid'
+
+// Generate unique ID
+const generateId = () => nanoid(10)
 
 interface SceneStore extends SceneConfig {
   // Environment Actions
@@ -42,9 +45,18 @@ interface SceneStore extends SceneConfig {
 export const useSceneStore = create<SceneStore>((set, get) => ({
   ...defaultSceneConfig,
 
-  updateEnvironment: (config) => set((state) => ({
-    environment: { ...state.environment, ...config }
-  })),
+  updateEnvironment: (config) => {
+    const oldEnv = { ...get().environment }
+    set((state) => ({
+      environment: { ...state.environment, ...config }
+    }))
+    const newEnv = { ...get().environment }
+    useHistoryStore.getState().pushAction({
+      description: 'Update environment',
+      undo: () => set({ environment: oldEnv }),
+      redo: () => set({ environment: newEnv })
+    })
+  },
 
   addLight: (type) => {
     const id = `light_${generateId()}`
@@ -67,18 +79,48 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     set((state) => ({
       lights: [...state.lights, newLight]
     }))
+    useHistoryStore.getState().pushAction({
+      description: `Add ${type} light`,
+      undo: () => set((state) => ({ lights: state.lights.filter(l => l.id !== id) })),
+      redo: () => set((state) => ({ lights: [...state.lights, newLight] }))
+    })
     return id
   },
 
-  updateLight: (id, config) => set((state) => ({
-    lights: state.lights.map((light) =>
-      light.id === id ? { ...light, ...config } : light
-    )
-  })),
+  updateLight: (id, config) => {
+    const oldLight = get().lights.find(l => l.id === id)
+    if (!oldLight) return
+    const oldConfig = { ...oldLight }
+    set((state) => ({
+      lights: state.lights.map((light) =>
+        light.id === id ? { ...light, ...config } : light
+      )
+    }))
+    const newConfig = { ...get().lights.find(l => l.id === id)! }
+    useHistoryStore.getState().pushAction({
+      description: `Update light ${id}`,
+      undo: () => set((state) => ({
+        lights: state.lights.map(l => l.id === id ? oldConfig : l)
+      })),
+      redo: () => set((state) => ({
+        lights: state.lights.map(l => l.id === id ? newConfig : l)
+      }))
+    })
+  },
 
-  removeLight: (id) => set((state) => ({
-    lights: state.lights.filter((light) => light.id !== id)
-  })),
+  removeLight: (id) => {
+    const removedLight = get().lights.find(l => l.id === id)
+    if (!removedLight) return
+    const lightCopy = { ...removedLight }
+    set((state) => ({
+      lights: state.lights.filter((light) => light.id !== id)
+    }))
+    useHistoryStore.getState().pushAction({
+      description: `Remove light ${id}`,
+      undo: () => set((state) => ({ lights: [...state.lights, lightCopy] })),
+      redo: () => set((state) => ({ lights: state.lights.filter(l => l.id !== id) }))
+    })
+  },
 
   updatePlayer: (config) => set((state) => ({
     player: { ...state.player, ...config }
@@ -88,27 +130,41 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     camera: state.camera ? { ...state.camera, ...config } : { ...defaultSceneConfig.camera!, ...config }
   })),
 
-  updateEffects: (config) => set((state) => {
-    const currentEffects = state.effects || defaultSceneConfig.effects!
-    const newEffects = typeof config === 'function' ? config(currentEffects) : config
+  updateEffects: (config) => {
+    const oldEffects = JSON.parse(JSON.stringify(get().effects || defaultSceneConfig.effects!))
+    set((state) => {
+      const currentEffects = state.effects || defaultSceneConfig.effects!
+      const newEffects = typeof config === 'function' ? config(currentEffects) : config
 
-    // Deep merge for nested config like 'ao'
-    return {
-      effects: {
-        ...currentEffects,
-        ...newEffects,
-        ao: newEffects.ao ? { ...currentEffects.ao, ...newEffects.ao } : currentEffects.ao
+      // Deep merge for all nested configs (ao, bloom, vignette, colorGrading)
+      const merged: any = { ...currentEffects, ...newEffects }
+      for (const key of Object.keys(newEffects) as (keyof EffectsConfig)[]) {
+        const val = newEffects[key]
+        if (val && typeof val === 'object' && !Array.isArray(val) && (currentEffects as any)[key]) {
+          merged[key] = { ...(currentEffects as any)[key], ...val }
+        }
       }
-    }
-  }),
+      return { effects: merged }
+    })
+    const newEffectsSnapshot = JSON.parse(JSON.stringify(get().effects))
+    useHistoryStore.getState().pushAction({
+      description: 'Update effects',
+      undo: () => set({ effects: oldEffects }),
+      redo: () => set({ effects: newEffectsSnapshot })
+    })
+  },
 
-  addDeletedMesh: (id) => set((state) => ({
-    deletedMeshIds: [...(state.deletedMeshIds || []), id]
-  })),
+  addDeletedMesh: (id) => set((state) => {
+    const existing = state.deletedMeshIds || []
+    if (existing.includes(id)) return {}
+    return { deletedMeshIds: [...existing, id] }
+  }),
 
   loadFromConfig: (config) => set(() => ({
     ...config,
     // Ensure defaults if missing in loaded config
+    player: config.player || defaultSceneConfig.player,
+    camera: config.camera || defaultSceneConfig.camera,
     effects: config.effects || defaultSceneConfig.effects,
     deletedMeshIds: config.deletedMeshIds || []
   })),

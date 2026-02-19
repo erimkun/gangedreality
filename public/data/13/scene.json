@@ -1,0 +1,86 @@
+{
+  "environment": {
+    "hdri": null,
+    "hdriPreset": "apartment",
+    "customHdriUrl": null,
+    "intensity": 0.7,
+    "rotation": 0,
+    "backgroundBlurriness": 0.1,
+    "showBackground": false,
+    "backgroundType": "infinite",
+    "spherePosition": [
+      0,
+      0,
+      0
+    ],
+    "sphereScale": 100,
+    "sphereRotation": 0,
+    "ambientLight": {
+      "intensity": 1.05,
+      "color": "#ffffff"
+    },
+    "hemisphereLight": {
+      "intensity": 0.45,
+      "skyColor": "#ffffff",
+      "groundColor": "#444444"
+    }
+  },
+  "lights": [],
+  "player": {
+    "startPosition": [
+      0,
+      1.7,
+      5
+    ],
+    "startRotation": [
+      0,
+      0,
+      0
+    ],
+    "moveSpeed": 2,
+    "eyeHeight": 1.7
+  },
+  "camera": {
+    "position": [
+      5,
+      5,
+      5
+    ],
+    "target": [
+      0,
+      0,
+      0
+    ],
+    "fov": 75
+  },
+  "effects": {
+    "ao": {
+      "enabled": true,
+      "color": "#000000",
+      "intensity": 0.6,
+      "radius": 1.4,
+      "distanceFalloff": 0.9,
+      "luminanceInfluence": 0.1,
+      "quality": "low"
+    },
+    "bloom": {
+      "enabled": true,
+      "intensity": 0.1,
+      "luminanceThreshold": 0.47,
+      "luminanceSmoothing": 0.16
+    },
+    "vignette": {
+      "enabled": false,
+      "offset": 0.46,
+      "darkness": 0.5
+    },
+    "colorGrading": {
+      "enabled": true,
+      "brightness": -0.05,
+      "contrast": -0.2,
+      "saturation": 0,
+      "hue": 0
+    }
+  },
+  "deletedMeshIds": []
+}

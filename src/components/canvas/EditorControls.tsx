@@ -432,6 +432,11 @@ export default function EditorControls() {
           pushAction({
             description: `Transform ${objectId}`,
             undo: () => {
+              // Guard: check if the object is still in the scene
+              if (!objectRef.parent) {
+                console.warn(`[EditorControls] Undo skipped: object ${objectId} no longer in scene`)
+                return
+              }
               objectRef.position.copy(preState.position)
               objectRef.rotation.copy(preState.rotation)
               objectRef.scale.copy(preState.scale)
@@ -469,6 +474,11 @@ export default function EditorControls() {
               log('Undo transform')
             },
             redo: () => {
+              // Guard: check if the object is still in the scene
+              if (!objectRef.parent) {
+                console.warn(`[EditorControls] Redo skipped: object ${objectId} no longer in scene`)
+                return
+              }
               objectRef.position.copy(postPosition)
               objectRef.rotation.copy(postRotation)
               objectRef.scale.copy(postScale)

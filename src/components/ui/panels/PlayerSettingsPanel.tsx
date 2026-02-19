@@ -191,8 +191,9 @@ function PositionInputGroup({ label, values, onChange }: PositionInputGroupProps
                 newValues[i] = parseFloat(e.target.value) || 0
                 onChange(newValues)
               }}
-              className={`w-full bg-editor-input border border-gray-600 rounded px-2 py-1.5 text-white text-sm focus:border-${i === 0 ? 'red' : i === 1 ? 'green' : 'blue'
-                }-400 focus:outline-none`}
+              className={`w-full bg-editor-input border border-gray-600 rounded px-2 py-1.5 text-white text-sm ${
+                ['focus:border-red-400', 'focus:border-green-400', 'focus:border-blue-400'][i]
+              } focus:outline-none`}
             />
           </div>
         ))}

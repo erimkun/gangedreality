@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { useProjectStore } from '@/store/useProjectStore'
 
 // Debug logger
-const DEBUG = true
+const DEBUG = false
 const log = (message: string, data?: unknown) => {
   if (DEBUG) {
     console.log(`[ModelLoader]`, message, data !== undefined ? data : '')

@@ -2,31 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { nanoid } from 'nanoid'
 import { useHistoryStore } from '@/hooks/useHistory'
+import type { HotspotShape, HotspotNode, HotspotSettings } from '@/types'
 
-export type HotspotShape = 'circle' | 'ring' | 'double-ring' | 'square' | 'triangle' | 'star' | 'target' | 'hexagon' | 'diamond' | 'arrow' | 'custom'
-
-export interface HotspotNode {
-  id: string
-  position: [number, number, number]
-  label?: string
-  visible: boolean
-  color?: string
-  size?: number
-  shape?: HotspotShape
-  customIconUrl?: string
-}
-
-export interface HotspotSettings {
-  cursorColor: string
-  cursorSize: number
-  cursorOpacity: number
-  defaultShape: HotspotShape
-  defaultCustomIconUrl?: string
-  animationDuration: number
-  nodeColor: string
-  nodeHoverColor: string
-  walkableMeshIds: string[]
-}
+// Re-export types for backward compatibility
+export type { HotspotShape, HotspotNode, HotspotSettings }
 
 interface HotspotStore {
   nodes: HotspotNode[]

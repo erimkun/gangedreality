@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react'
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import { useFrame, ThreeEvent, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -217,6 +217,34 @@ export default function HotspotRenderer({ isEditor = false }: HotspotRendererPro
     }
   }, [isEditor, isHotspotMode, raycaster, camera, scene, pointer, settings.walkableMeshIds])
 
+  // Centralized ref map for all hotspot node meshes
+  const nodeRefs = useRef<Record<string, THREE.Object3D | null>>({})
+
+  const registerNodeRef = useCallback((nodeId: string, obj: THREE.Object3D | null) => {
+    if (obj) {
+      nodeRefs.current[nodeId] = obj
+    } else {
+      delete nodeRefs.current[nodeId]
+    }
+  }, [])
+
+  // Single useFrame for all hotspot nodes — replaces N per-node useFrames
+  useFrame(() => {
+    if (!selectedObjectId) return
+    const obj = nodeRefs.current[selectedObjectId]
+    if (!obj) return
+    const node = nodes.find(n => n.id === selectedObjectId)
+    if (!node) return
+    const { x, y, z } = obj.position
+    if (
+      Math.abs(x - node.position[0]) > 0.01 ||
+      Math.abs(y - node.position[1]) > 0.01 ||
+      Math.abs(z - node.position[2]) > 0.01
+    ) {
+      updateNode(node.id, { position: [x, y, z] })
+    }
+  })
+
   return (
     <group>
       {nodes.map((node) => (
@@ -227,15 +255,13 @@ export default function HotspotRenderer({ isEditor = false }: HotspotRendererPro
           isSelected={selectedObjectId === node.id}
           isHovered={hoveredNode === node.id}
           settings={settings}
+          registerRef={registerNodeRef}
           onPointerOver={() => setHoveredNode(node.id)}
           onPointerOut={() => setHoveredNode(null)}
           onSelect={(mesh: THREE.Mesh) => {
             if (isEditor) {
               selectObject(mesh, node.id)
             }
-          }}
-          onUpdatePosition={(pos: [number, number, number]) => {
-            updateNode(node.id, { position: pos })
           }}
         />
       ))}
@@ -249,10 +275,10 @@ interface HotspotNodeMeshProps {
   isSelected: boolean
   isHovered: boolean
   settings: HotspotSettings
+  registerRef: (nodeId: string, obj: THREE.Object3D | null) => void
   onPointerOver: () => void
   onPointerOut: () => void
   onSelect: (mesh: THREE.Mesh) => void
-  onUpdatePosition: (pos: [number, number, number]) => void
 }
 
 function HotspotNodeMesh({ 
@@ -261,35 +287,31 @@ function HotspotNodeMesh({
   isSelected, 
   isHovered, 
   settings,
+  registerRef,
   onPointerOver,
   onPointerOut,
-  onSelect,
-  onUpdatePosition
+  onSelect
 }: HotspotNodeMeshProps) {
   const { isHotspotMode } = useHotspotStore()
   const meshRef = useRef<THREE.Mesh>(null)
-  
+
+  // Register ref with parent for centralized useFrame sync
+  const setGroupRef = useCallback((el: THREE.Group | null) => {
+    ;(meshRef as any).current = el
+    registerRef(node.id, el)
+  }, [node.id, registerRef])
+
+  // Cleanup ref on unmount
+  useEffect(() => {
+    return () => registerRef(node.id, null)
+  }, [node.id, registerRef])
+
   // Sync position from store to mesh (only if NOT selected, to avoid fighting with Gizmo)
   useEffect(() => {
     if (meshRef.current && !isSelected) {
       meshRef.current.position.set(node.position[0], node.position[1], node.position[2])
     }
   }, [node.position, isSelected])
-
-  // Sync position from mesh to store (when selected and moving)
-  useFrame(() => {
-    if (isSelected && meshRef.current) {
-      const currentPos = meshRef.current.position
-      // Check if position changed significantly to avoid spamming store updates
-      if (
-        Math.abs(currentPos.x - node.position[0]) > 0.01 ||
-        Math.abs(currentPos.y - node.position[1]) > 0.01 ||
-        Math.abs(currentPos.z - node.position[2]) > 0.01
-      ) {
-        onUpdatePosition([currentPos.x, currentPos.y, currentPos.z])
-      }
-    }
-  })
   
   // Visuals
   const nodeColor = node.color || settings.nodeColor
@@ -307,7 +329,7 @@ function HotspotNodeMesh({
       {isEditor && isHotspotMode && (
         <>
           <group
-            ref={meshRef as any}
+            ref={setGroupRef}
             name="hotspot-node-visual"
             position={node.position}
             onClick={(e: ThreeEvent<MouseEvent>) => {

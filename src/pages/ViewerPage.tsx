@@ -9,6 +9,13 @@ export default function ViewerPage() {
   const { projectExists, isLoading } = useProjectStore()
   const [checked, setChecked] = useState(false)
 
+  // Redirect to home if no projectId
+  useEffect(() => {
+    if (!projectId) {
+      navigate('/', { replace: true })
+    }
+  }, [projectId, navigate])
+
   // After project load attempt, redirect to editor if project doesn't exist
   useEffect(() => {
     if (!isLoading && checked && !projectExists && projectId) {
@@ -24,6 +31,8 @@ export default function ViewerPage() {
       return () => clearTimeout(timer)
     }
   }, [isLoading, projectId])
+
+  if (!projectId) return null
 
   return <ViewerContent projectId={projectId} />
 }

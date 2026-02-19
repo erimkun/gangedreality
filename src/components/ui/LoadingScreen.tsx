@@ -10,7 +10,7 @@ export default function LoadingScreen({
   subMessage 
 }: LoadingScreenProps) {
   return (
-    <div className="w-full h-full bg-editor-bg flex flex-col items-center justify-center">
+    <div className="w-full h-full bg-editor-bg flex flex-col items-center justify-center" role="status" aria-live="polite">
       <div className="relative w-20 h-20 mb-6">
         {/* Spinner */}
         <div className="absolute inset-0 border-4 border-editor-accent rounded-full animate-spin border-t-editor-highlight" />

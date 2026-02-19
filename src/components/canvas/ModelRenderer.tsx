@@ -10,7 +10,7 @@ import { useHotspotStore } from '@/store/useHotspotStore'
 import { ModelConfig } from '@/types'
 
 // Debug logger utility
-const DEBUG = true
+const DEBUG = false
 const log = (context: string, message: string, data?: unknown) => {
   if (DEBUG) {
     console.log(`[ModelRenderer/${context}]`, message, data !== undefined ? data : '')
@@ -303,6 +303,9 @@ function LoadedModel({
     // Key format: `${groupId}-${optionIndex}-${originalMaterialUuid}`
     const variantMaterialCache = new Map<string, THREE.Material>()
     
+    // Track loaded textures for cleanup
+    const loadedTextures: THREE.Texture[] = []
+    
     // Create texture loader with crossOrigin support for blob URLs
     const textureLoader = new THREE.TextureLoader()
     textureLoader.crossOrigin = 'anonymous'
@@ -386,6 +389,7 @@ function LoadedModel({
                     selectedOption.textureUrl, 
                     (texture) => {
                       applyTextureSettings(texture, true) // sRGB for color maps
+                      loadedTextures.push(texture)
                       stdMat.map = texture
                       stdMat.color.set('#ffffff') // Reset color to white so texture shows properly
                       stdMat.needsUpdate = true
@@ -410,6 +414,7 @@ function LoadedModel({
                     (normalMap) => {
                       applyTextureSettings(normalMap, false) // Linear for normal maps
                       try { normalMap.colorSpace = THREE.NoColorSpace } catch { /* read-only */ }
+                      loadedTextures.push(normalMap)
                       stdMat.normalMap = normalMap
                       stdMat.needsUpdate = true
                       log('LoadedModel', `✓ Normal map loaded for ${child.name}`)
@@ -426,6 +431,7 @@ function LoadedModel({
                     (roughnessMap) => {
                       applyTextureSettings(roughnessMap, false) // Linear for roughness maps
                       try { roughnessMap.colorSpace = THREE.NoColorSpace } catch { /* read-only */ }
+                      loadedTextures.push(roughnessMap)
                       stdMat.roughnessMap = roughnessMap
                       stdMat.needsUpdate = true
                       log('LoadedModel', `✓ Roughness map loaded for ${child.name}`)
@@ -452,6 +458,21 @@ function LoadedModel({
         }
       })
     })
+
+    // Cleanup: dispose variant materials and textures when effect re-runs
+    return () => {
+      // Restore original materials
+      scene.traverse((child: THREE.Object3D) => {
+        if (child instanceof THREE.Mesh && child.userData.originalMaterial) {
+          child.material = child.userData.originalMaterial
+        }
+      })
+      // Dispose loaded textures
+      loadedTextures.forEach(tex => tex.dispose())
+      // Dispose cached variant materials
+      variantMaterialCache.forEach(mat => mat.dispose())
+      variantMaterialCache.clear()
+    }
   }, [configurableGroups, scene, isEditor])
 
   // Apply mesh transforms from config (for both Editor and Viewer)

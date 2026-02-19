@@ -168,7 +168,8 @@ export class SimpleOctree {
     }
     
     // Find closest point on capsule to triangle
-    const t = Math.abs(d1) / (Math.abs(d1) + Math.abs(d2))
+    const denom = Math.abs(d1) + Math.abs(d2)
+    const t = denom === 0 ? 0.5 : Math.abs(d1) / denom
     this._closestPoint.copy(capsule.start).lerp(capsule.end, t)
     
     // Get closest point on triangle

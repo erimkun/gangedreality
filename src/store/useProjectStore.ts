@@ -12,7 +12,7 @@ import { useVariantsStore } from './useVariantsStore'
 import { useHotspotStore } from './useHotspotStore'
 
 // Debug logger
-const DEBUG = true
+const DEBUG = false
 const log = (action: string, data?: unknown) => {
   if (DEBUG) {
     console.log(`[ProjectStore/${action}]`, data !== undefined ? data : '')
@@ -66,6 +66,9 @@ interface ProjectState {
   resetProject: () => void
 }
 
+// Load version counter to prevent race conditions
+let _loadVersion = 0
+
 export const useProjectStore = create<ProjectState>((set, get) => ({
   // Initial State
   projectId: null,
@@ -81,7 +84,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   // Load project from server
   loadProject: async (projectId: string) => {
-    log('loadProject', { projectId })
+    const thisLoad = ++_loadVersion
+    log('loadProject', { projectId, loadVersion: thisLoad })
     set({ isLoading: true, error: null })
 
     resetGlobalAssetMaps()
@@ -89,6 +93,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       // Try to fetch project.json from the data folder
       const response = await fetch(`/data/${projectId}/project.json`)
+
+      // Stale check: another loadProject was called while we were fetching
+      if (thisLoad !== _loadVersion) return false
 
       // Check both status and content-type — SPA fallback may return index.html with 200
       const contentType = response.headers.get('content-type') || ''
@@ -110,19 +117,23 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
       // Load other config files
       const [sceneRes, interactionsRes, variantsRes, hotspotsRes] = await Promise.all([
-        fetch(`/data/${projectId}/scene.json`).catch(() => null),
-        fetch(`/data/${projectId}/interactions.json`).catch(() => null),
-        fetch(`/data/${projectId}/variants.json`).catch(() => null),
-        fetch(`/data/${projectId}/hotspots.json`).catch(() => null)
+        fetch(`/data/${projectId}/scene.json`).catch((e) => { log('loadProject', `scene.json fetch failed: ${e.message}`); return null }),
+        fetch(`/data/${projectId}/interactions.json`).catch((e) => { log('loadProject', `interactions.json fetch failed: ${e.message}`); return null }),
+        fetch(`/data/${projectId}/variants.json`).catch((e) => { log('loadProject', `variants.json fetch failed: ${e.message}`); return null }),
+        fetch(`/data/${projectId}/hotspots.json`).catch((e) => { log('loadProject', `hotspots.json fetch failed: ${e.message}`); return null })
       ])
+
+      // Stale check: another loadProject was called while we were fetching configs
+      if (thisLoad !== _loadVersion) return false
 
       // Convert relative model path to absolute path
       // e.g., "model/file.glb" -> "/data/projectId/model/file.glb"
-      const assets = { ...projectData.assets }
-
-      // Ensure models array exists for backward compatibility
-      if (!assets.models) {
-        assets.models = []
+      const assets = {
+        ...projectData.assets,
+        // Deep-clone models array to avoid mutating the original projectData
+        models: projectData.assets.models
+          ? projectData.assets.models.map(m => ({ ...m }))
+          : []
       }
 
       if (assets.mainModel && !assets.mainModel.startsWith('/') && !assets.mainModel.startsWith('blob:') && !assets.mainModel.startsWith('http')) {
@@ -390,6 +401,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   removeModel: (id: string) => {
     log('removeModel', { id })
+    // Revoke blob URL if model used one
+    const model = get().assets.models.find(m => m.id === id)
+    if (model?.url && model.url.startsWith('blob:')) {
+      URL.revokeObjectURL(model.url)
+    }
     set(state => ({
       assets: {
         ...state.assets,

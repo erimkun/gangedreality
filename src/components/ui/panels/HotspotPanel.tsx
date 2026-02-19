@@ -234,6 +234,10 @@ export default function HotspotPanel() {
                                     const file = e.target.files?.[0]
                                     if (file) {
                                         const url = URL.createObjectURL(file)
+                                        // Revoke old blob URL if exists
+                                        if (node.customIconUrl && node.customIconUrl.startsWith('blob:')) {
+                                            URL.revokeObjectURL(node.customIconUrl)
+                                        }
                                         // Store for export
                                         const win = window as any
                                         if (!win.__loadedTextures) win.__loadedTextures = new Map()
@@ -305,6 +309,10 @@ export default function HotspotPanel() {
                             const file = e.target.files?.[0]
                             if (file) {
                                 const url = URL.createObjectURL(file)
+                                // Revoke old blob URL if exists
+                                if (settings.defaultCustomIconUrl && settings.defaultCustomIconUrl.startsWith('blob:')) {
+                                    URL.revokeObjectURL(settings.defaultCustomIconUrl)
+                                }
                                 // Store for export
                                 const win = window as any
                                 if (!win.__loadedTextures) win.__loadedTextures = new Map()

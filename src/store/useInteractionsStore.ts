@@ -4,16 +4,18 @@ import {
   InteractionZone,
   PopupContent
 } from '@/types'
+import { useHistoryStore } from '@/hooks/useHistory'
+import { nanoid } from 'nanoid'
 
 // Debug logger
-const DEBUG = true
+const DEBUG = false
 const log = (action: string, data?: unknown) => {
   if (DEBUG) {
     console.log(`[InteractionsStore/${action}]`, data !== undefined ? data : '')
   }
 }
 
-const generateId = () => `zone_${Math.random().toString(36).substring(2, 11)}`
+const generateId = () => `zone_${nanoid(10)}`
 
 interface InteractionsState {
   zones: InteractionZone[]
@@ -82,19 +84,47 @@ export const useInteractionsStore = create<InteractionsState>((set, get) => ({
       activeZoneId: id
     }))
 
+    useHistoryStore.getState().pushAction({
+      description: `Add interaction zone`,
+      undo: () => set(state => ({
+        zones: state.zones.filter(z => z.id !== id),
+        activeZoneId: state.activeZoneId === id ? null : state.activeZoneId
+      })),
+      redo: () => set(state => ({
+        zones: [...state.zones, newZone],
+        activeZoneId: id
+      }))
+    })
+
     log('addZone', 'Zone added successfully, total zones: ' + (get().zones.length))
     return id
   },
 
   updateZone: (id, updates) => {
+    const oldZone = get().zones.find(z => z.id === id)
+    if (!oldZone) return
+    const oldCopy = JSON.parse(JSON.stringify(oldZone))
     set(state => ({
       zones: state.zones.map(zone =>
         zone.id === id ? { ...zone, ...updates } : zone
       )
     }))
+    const newCopy = JSON.parse(JSON.stringify(get().zones.find(z => z.id === id)))
+    useHistoryStore.getState().pushAction({
+      description: `Update zone ${id}`,
+      undo: () => set(state => ({
+        zones: state.zones.map(z => z.id === id ? oldCopy : z)
+      })),
+      redo: () => set(state => ({
+        zones: state.zones.map(z => z.id === id ? newCopy : z)
+      }))
+    })
   },
 
   updateZonePopup: (id, popupUpdates) => {
+    const oldZone = get().zones.find(z => z.id === id)
+    if (!oldZone) return
+    const oldPopup = JSON.parse(JSON.stringify(oldZone.popup))
     set(state => ({
       zones: state.zones.map(zone =>
         zone.id === id
@@ -102,13 +132,34 @@ export const useInteractionsStore = create<InteractionsState>((set, get) => ({
           : zone
       )
     }))
+    const newPopup = JSON.parse(JSON.stringify(get().zones.find(z => z.id === id)!.popup))
+    useHistoryStore.getState().pushAction({
+      description: `Update zone popup ${id}`,
+      undo: () => set(state => ({
+        zones: state.zones.map(z => z.id === id ? { ...z, popup: oldPopup } : z)
+      })),
+      redo: () => set(state => ({
+        zones: state.zones.map(z => z.id === id ? { ...z, popup: newPopup } : z)
+      }))
+    })
   },
 
   removeZone: (id) => {
+    const removedZone = get().zones.find(z => z.id === id)
+    if (!removedZone) return
+    const zoneCopy = JSON.parse(JSON.stringify(removedZone))
     set(state => ({
       zones: state.zones.filter(zone => zone.id !== id),
       activeZoneId: state.activeZoneId === id ? null : state.activeZoneId
     }))
+    useHistoryStore.getState().pushAction({
+      description: `Remove zone ${id}`,
+      undo: () => set(state => ({ zones: [...state.zones, zoneCopy] })),
+      redo: () => set(state => ({
+        zones: state.zones.filter(z => z.id !== id),
+        activeZoneId: state.activeZoneId === id ? null : state.activeZoneId
+      }))
+    })
   },
 
   setActiveZone: (id) => {

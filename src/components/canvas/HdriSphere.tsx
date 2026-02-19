@@ -13,8 +13,8 @@ function HdriSphere({ url, position, scale, rotation }: HdriSphereProps) {
     const meshRef = useRef<THREE.Mesh>(null)
     const [texture, setTexture] = useState<THREE.Texture | null>(null)
 
-    // Determine loader based on extension
-    const isHdr = url.toLowerCase().includes('.hdr') || url.toLowerCase().includes('.exr')
+    // Determine loader based on extension (only .hdr supported)
+    const isHdr = url.toLowerCase().endsWith('.hdr')
 
     // Load texture manually instead of useLoader to avoid shared-cache mutation issues
     useEffect(() => {

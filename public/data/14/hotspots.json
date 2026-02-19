@@ -1,0 +1,46 @@
+{
+  "nodes": [
+    {
+      "id": "1pAfOzu76gJb0Ygpz__LZ",
+      "position": [
+        -1.6378022846592175,
+        0.10000600814848326,
+        1.4388261121026118
+      ],
+      "visible": true,
+      "label": "Giriş"
+    },
+    {
+      "id": "7YyQR1xSq4BeTjIBwi8tL",
+      "position": [
+        0.36811922128316366,
+        0.10000600814848326,
+        -1.2483153501977686
+      ],
+      "visible": true,
+      "label": "Gelişme"
+    },
+    {
+      "id": "3FshSYvunBi7Nimj_3l4p",
+      "position": [
+        0.48857508356956336,
+        0.1000060081484828,
+        1.4782189834781252
+      ],
+      "visible": true,
+      "label": "Sonuç"
+    }
+  ],
+  "settings": {
+    "cursorColor": "#ffffff",
+    "cursorSize": 0.4,
+    "cursorOpacity": 0.8,
+    "defaultShape": "double-ring",
+    "animationDuration": 0.3,
+    "nodeColor": "#d0d3d8",
+    "nodeHoverColor": "#60a5fa",
+    "walkableMeshIds": [
+      "Layer1_bo"
+    ]
+  }
+}

@@ -552,12 +552,16 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
             <Environment
               preset={environment.hdriPreset || 'apartment'}
               background={environment.showBackground && environment.backgroundType !== 'sphere' || false}
+              environmentIntensity={environment.intensity ?? 1}
+              backgroundBlurriness={environment.backgroundBlurriness ?? 0}
             />
           ) : environment.customHdriUrl ? (
             <>
               <Environment
                 files={environment.customHdriUrl}
                 background={environment.showBackground && environment.backgroundType !== 'sphere' || false}
+                environmentIntensity={environment.intensity ?? 1}
+                backgroundBlurriness={environment.backgroundBlurriness ?? 0}
               />
               {/* HDRI Sphere Mode */}
               {environment.backgroundType === 'sphere' && (
@@ -573,6 +577,8 @@ export default function ViewerContent({ onClose, isPreview = false, projectId }:
             <Environment
               preset="apartment"
               background={environment.showBackground || false}
+              environmentIntensity={environment.intensity ?? 1}
+              backgroundBlurriness={environment.backgroundBlurriness ?? 0}
             />
           )}
 

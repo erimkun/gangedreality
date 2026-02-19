@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import * as THREE from 'three'
 import { useSceneStore } from './useSceneStore'
+import { useHistoryStore } from '@/hooks/useHistory'
 
 // Debug logger
 const DEBUG = false
@@ -256,6 +257,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         mesh.object.visible = false
       }
       set({ hiddenMeshIds: newHidden })
+
+      useHistoryStore.getState().pushAction({
+        description: `Toggle visibility: ${mesh.name}`,
+        undo: () => {
+          const m = get().sceneMeshes.find(mi => mi.id === id)
+          if (m) {
+            m.object.visible = !willBeHidden
+            const h = new Set(get().hiddenMeshIds)
+            if (willBeHidden) h.delete(id); else h.add(id)
+            set({ hiddenMeshIds: h })
+          }
+        },
+        redo: () => {
+          const m = get().sceneMeshes.find(mi => mi.id === id)
+          if (m) {
+            m.object.visible = !willBeHidden ? false : true
+            const h = new Set(get().hiddenMeshIds)
+            if (willBeHidden) h.add(id); else h.delete(id)
+            set({ hiddenMeshIds: h })
+          }
+        }
+      })
     }
   },
 
@@ -292,10 +315,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           meshInfo.object.geometry.dispose()
         }
         if (meshInfo.object.material) {
+          const disposeMaterial = (mat: THREE.Material) => {
+            // Dispose all textures attached to the material
+            const stdMat = mat as any
+            const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'displacementMap', 'alphaMap', 'bumpMap', 'envMap', 'lightMap']
+            for (const prop of textureProps) {
+              if (stdMat[prop] && stdMat[prop] instanceof THREE.Texture) {
+                stdMat[prop].dispose()
+              }
+            }
+            mat.dispose()
+          }
           if (Array.isArray(meshInfo.object.material)) {
-            meshInfo.object.material.forEach((m: any) => m.dispose())
+            meshInfo.object.material.forEach(disposeMaterial)
           } else {
-            (meshInfo.object.material as any).dispose()
+            disposeMaterial(meshInfo.object.material)
           }
         }
       }

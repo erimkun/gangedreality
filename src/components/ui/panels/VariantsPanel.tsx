@@ -390,7 +390,10 @@ export default function VariantsPanel() {
 
   const handleSaveOptionEdit = () => {
     if (editingOption) {
-      // Final save (already updated live, just close and show toast)
+      // Save the name (and any other local-only changes) to store
+      updateOption(editingOption.groupId, editingOption.optionIndex, {
+        name: editingOption.option.name
+      })
       addToast(`${editingOption.option.name} güncellendi`, 'success')
       setEditingOption(null)
     }

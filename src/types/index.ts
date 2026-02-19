@@ -1,7 +1,31 @@
 // Type Definitions for the Project
 // Based on Project.md specifications
 
-import { HotspotNode, HotspotSettings } from '@/store/useHotspotStore'
+// ============ HOTSPOT TYPES (canonical source) ============
+export type HotspotShape = 'circle' | 'ring' | 'double-ring' | 'square' | 'triangle' | 'star' | 'target' | 'hexagon' | 'diamond' | 'arrow' | 'custom'
+
+export interface HotspotNode {
+  id: string
+  position: [number, number, number]
+  label?: string
+  visible: boolean
+  color?: string
+  size?: number
+  shape?: HotspotShape
+  customIconUrl?: string
+}
+
+export interface HotspotSettings {
+  cursorColor: string
+  cursorSize: number
+  cursorOpacity: number
+  defaultShape: HotspotShape
+  defaultCustomIconUrl?: string
+  animationDuration: number
+  nodeColor: string
+  nodeHoverColor: string
+  walkableMeshIds: string[]
+}
 
 // ============ MODEL CONFIG ============
 export interface ModelConfig {

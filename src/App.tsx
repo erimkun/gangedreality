@@ -12,14 +12,16 @@ function EditorGate() {
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [authorized, setAuthorized] = useState(false)
 
   const editorPassword = import.meta.env.VITE_EDITOR_PASSWORD as string | undefined
   const isPasswordRequired = Boolean(editorPassword && editorPassword.trim())
 
   const isAuthorized = useMemo(() => {
     if (!isPasswordRequired) return true
+    if (authorized) return true
     return localStorage.getItem(EDITOR_AUTH_STORAGE_KEY) === editorPassword
-  }, [editorPassword, isPasswordRequired])
+  }, [editorPassword, isPasswordRequired, authorized])
 
   if (isAuthorized) {
     return <EditorPage />
@@ -34,6 +36,7 @@ function EditorGate() {
     localStorage.setItem(EDITOR_AUTH_STORAGE_KEY, editorPassword)
     setError(null)
     setPassword('')
+    setAuthorized(true)
   }
 
   const handleCancel = () => {

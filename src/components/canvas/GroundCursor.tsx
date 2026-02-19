@@ -58,7 +58,6 @@ export default function GroundCursor({ position, visible }: GroundCursorProps) {
       ref={meshRef} 
       rotation={[-Math.PI / 2, 0, 0]} 
       visible={visible}
-      position={position}
     >
       <planeGeometry args={[settings.cursorSize / 2, settings.cursorSize / 2]} />
       <meshBasicMaterial 

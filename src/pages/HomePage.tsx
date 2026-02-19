@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 
-// Mevcut projeleri listele - public/data klasöründeki gerçek projeler
-const AVAILABLE_PROJECTS = ['1108-1', 'demo']
+// Fallback proje listesi — projects.json yüklenemezse kullanılır
+const FALLBACK_PROJECTS = ['1108-1', 'demo']
 
 // WebGL Arka Plan Bileşeni
 function WebGLBackground() {
@@ -163,8 +163,10 @@ function WebGLBackground() {
       window.removeEventListener('resize', handleResize)
       window.removeEventListener('mousemove', handleMouseMove)
       if (animationRef.current) cancelAnimationFrame(animationRef.current)
-      renderer.dispose()
+      scene.remove(mesh)
+      mesh.geometry.dispose()
       material.dispose()
+      renderer.dispose()
       container.removeChild(renderer.domElement)
     }
   }, [])
@@ -211,11 +213,20 @@ export default function HomePage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [showNewProjectModal, setShowNewProjectModal] = useState(false)
   const [newProjectId, setNewProjectId] = useState('')
+  const [availableProjects, setAvailableProjects] = useState<string[]>(FALLBACK_PROJECTS)
   const searchRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  // Proje listesini dinamik yükle
+  useEffect(() => {
+    fetch('/data/projects.json')
+      .then(r => r.ok ? r.json() : FALLBACK_PROJECTS)
+      .then((list: string[]) => setAvailableProjects(list))
+      .catch(() => setAvailableProjects(FALLBACK_PROJECTS))
+  }, [])
+
   // Arama sonuçlarını filtrele
-  const filteredProjects = AVAILABLE_PROJECTS.filter(project =>
+  const filteredProjects = availableProjects.filter(project =>
     project.toLowerCase().includes(searchQuery.toLowerCase())
   )
 

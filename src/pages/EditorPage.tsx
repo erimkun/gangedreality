@@ -162,13 +162,15 @@ export default function EditorPage() {
   const [showSimulation, setShowSimulation] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
     if (projectId) {
       loadProject(projectId).then((exists) => {
-        if (!exists) {
+        if (!cancelled && !exists) {
           setShowNewProjectDialog(true)
         }
       })
     }
+    return () => { cancelled = true }
   }, [projectId, loadProject])
 
   const handleCreateNewProject = (name: string) => {
@@ -192,9 +194,10 @@ export default function EditorPage() {
         return
       }
 
-      // Transform tool shortcuts (G, E, R, S)
+      // Transform tool shortcuts (W/G, E, R/S)
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         switch (e.key.toLowerCase()) {
+          case 'w': // W = Translate
           case 'g': // G = Grab (Translate)
             setActiveTool('translate')
             break
@@ -280,12 +283,16 @@ export default function EditorPage() {
             <Environment
               preset={environment.hdriPreset || 'apartment'}
               background={environment.showBackground && environment.backgroundType !== 'sphere' || false}
+              environmentIntensity={environment.intensity ?? 1}
+              backgroundBlurriness={environment.backgroundBlurriness ?? 0}
             />
           ) : environment.customHdriUrl ? (
             <>
               <Environment
                 files={environment.customHdriUrl}
                 background={environment.showBackground && environment.backgroundType !== 'sphere' || false}
+                environmentIntensity={environment.intensity ?? 1}
+                backgroundBlurriness={environment.backgroundBlurriness ?? 0}
               />
               {/* HDRI Sphere Mode */}
               {environment.backgroundType === 'sphere' && (
@@ -301,6 +308,8 @@ export default function EditorPage() {
             <Environment
               preset="apartment"
               background={environment.showBackground || false}
+              environmentIntensity={environment.intensity ?? 1}
+              backgroundBlurriness={environment.backgroundBlurriness ?? 0}
             />
           )}
 
