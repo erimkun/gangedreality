@@ -26,6 +26,9 @@ import { toast } from '@/store/useToastStore'
 import HotspotRenderer from '@/components/canvas/HotspotRenderer'
 import HdriSphere from '@/components/canvas/HdriSphere'
 import { FPSCounter } from '@/components/ui/FPSCounter'
+import ServerAuthModal from '@/components/ui/ServerAuthModal'
+import { isAuthenticated, saveProject as apiSaveProject, uploadAsset } from '@/services/api'
+import type { MeshMaterialOverride } from '@/types'
 
 // Editor Camera Initializer - Sets camera to saved orbit position on load
 function EditorCameraInitializer() {
@@ -160,6 +163,9 @@ export default function EditorPage() {
   const [showModelUpload, setShowModelUpload] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [showSimulation, setShowSimulation] = useState(false)
+  const [isSavingToServer, setIsSavingToServer] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [pendingSave, setPendingSave] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -227,6 +233,180 @@ export default function EditorPage() {
     }
     setIsExporting(false)
   }, [getFullProjectData])
+
+  const doSaveToServer = useCallback(async () => {
+    if (!projectId) return
+    setIsSavingToServer(true)
+    try {
+      // Deep clone to avoid mutating live store state
+      const data = JSON.parse(JSON.stringify(getFullProjectData()))
+
+      const win = window as any
+
+      // Helper: strip blob/absolute URLs back to relative paths
+      const resolveUrl = (url?: string | null): string | undefined | null => {
+        if (!url) return url
+        // blob URL → check __blobUrlToFileName / __dataUrlToFileName maps
+        if (url.startsWith('blob:') || url.startsWith('data:')) {
+          if (win.__blobUrlToFileName?.has(url)) return win.__blobUrlToFileName.get(url)
+          if (win.__dataUrlToFileName?.has(url)) return win.__dataUrlToFileName.get(url)
+        }
+        // Absolute /data/projectId/... → strip to relative
+        const prefix = `/data/${projectId}/`
+        if (url.startsWith(prefix)) return url.slice(prefix.length)
+        return url
+      }
+
+      // Upload model files that are blobs
+      const modelFileMap = new Map<string, string>() // blobUrl → relative path
+      if (win.__loadedModelFiles?.length) {
+        for (const file of win.__loadedModelFiles) {
+          try {
+            const relativePath = await uploadAsset(projectId, file, 'model')
+            // Map all blob URLs for this filename
+            modelFileMap.set(file.name, relativePath) // "model/scene.glb"
+          } catch (e) {
+            console.warn('Model upload skipped:', e)
+          }
+        }
+      }
+
+      // Upload texture files that are blobs
+      if (win.__loadedTextures?.size) {
+        for (const [filename, file] of win.__loadedTextures) {
+          if (file instanceof File || file instanceof Blob) {
+            try {
+              await uploadAsset(projectId, file instanceof File ? file : new File([file], filename), 'textures')
+            } catch (e) {
+              console.warn('Texture upload skipped:', e)
+            }
+          }
+        }
+      }
+
+      // Upload interaction image blobs
+      if (win.__interactionFiles?.size && data.interactions?.zones) {
+        for (const zone of data.interactions.zones) {
+          if (zone.popup?.blocks) {
+            for (const block of zone.popup.blocks) {
+              if (block.type === 'image' && block.content?.startsWith('blob:') && win.__interactionFiles.has(block.content)) {
+                const file = win.__interactionFiles.get(block.content)
+                if (file) {
+                  try {
+                    const safeFileName = `int_${zone.id}_${block.id}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+                    await uploadAsset(projectId, new File([file], safeFileName), 'textures')
+                    block.content = `textures/${safeFileName}`
+                  } catch (e) {
+                    console.warn('Interaction image upload skipped:', e)
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // --- Replace blob/absolute URLs with relative paths in project data ---
+
+      // Models
+      if (data.project.assets.mainModel) {
+        const resolved = resolveUrl(data.project.assets.mainModel)
+        if (resolved?.startsWith('blob:') && win.__loadedModelFiles?.length) {
+          // Blob URL not in map — use the filename
+          data.project.assets.mainModel = `model/${win.__loadedModelFiles[0].name}`
+        } else {
+          data.project.assets.mainModel = resolved
+        }
+      }
+      if (data.project.assets.models?.length) {
+        let fileIdx = 0
+        for (const model of data.project.assets.models) {
+          if (model.url) {
+            const resolved = resolveUrl(model.url)
+            if (resolved?.startsWith('blob:') && win.__loadedModelFiles?.[fileIdx]) {
+              model.url = `model/${win.__loadedModelFiles[fileIdx].name}`
+              fileIdx++
+            } else {
+              model.url = resolved
+            }
+          }
+
+          if (model.meshMaterialOverrides) {
+            Object.values(model.meshMaterialOverrides as Record<string, MeshMaterialOverride>).forEach((override) => {
+              override.textureUrl = resolveUrl(override.textureUrl)
+              override.normalMapUrl = resolveUrl(override.normalMapUrl)
+              override.roughnessMapUrl = resolveUrl(override.roughnessMapUrl)
+            })
+          }
+        }
+      }
+
+      // Scene HDRI
+      if (data.scene?.environment?.customHdriUrl) {
+        data.scene.environment.customHdriUrl = resolveUrl(data.scene.environment.customHdriUrl)
+      }
+
+      // Variants textures
+      if (data.variants?.configurableGroups) {
+        for (const group of data.variants.configurableGroups) {
+          if (group.options) {
+            for (const opt of group.options) {
+              opt.textureUrl = resolveUrl(opt.textureUrl)
+              opt.normalMapUrl = resolveUrl(opt.normalMapUrl)
+              opt.roughnessMapUrl = resolveUrl(opt.roughnessMapUrl)
+            }
+          }
+        }
+      }
+
+      // Hotspot icons
+      if (data.hotspots?.nodes) {
+        for (const node of data.hotspots.nodes) {
+          node.customIconUrl = resolveUrl(node.customIconUrl)
+        }
+      }
+      if (data.hotspots?.settings?.defaultCustomIconUrl) {
+        data.hotspots.settings.defaultCustomIconUrl = resolveUrl(data.hotspots.settings.defaultCustomIconUrl)
+      }
+
+      await apiSaveProject(projectId, {
+        project: data.project,
+        scene: data.scene,
+        interactions: data.interactions,
+        variants: data.variants,
+        hotspots: data.hotspots,
+      })
+
+      toast.success('Proje sunucuya kaydedildi!')
+    } catch (error: any) {
+      console.error('Server save failed:', error)
+      if (error.message === 'AUTH_REQUIRED') {
+        setShowAuthModal(true)
+        setPendingSave(true)
+      } else {
+        toast.error('Sunucuya kaydetme başarısız: ' + (error.message || ''))
+      }
+    } finally {
+      setIsSavingToServer(false)
+    }
+  }, [projectId, getFullProjectData])
+
+  const handleSaveToServer = useCallback(() => {
+    if (!isAuthenticated()) {
+      setShowAuthModal(true)
+      setPendingSave(true)
+      return
+    }
+    doSaveToServer()
+  }, [doSaveToServer])
+
+  const handleAuthSuccess = useCallback(() => {
+    setShowAuthModal(false)
+    if (pendingSave) {
+      setPendingSave(false)
+      doSaveToServer()
+    }
+  }, [pendingSave, doSaveToServer])
 
   const handleModelLoaded = useCallback(() => {
     setShowModelUpload(false)
@@ -460,6 +640,24 @@ export default function EditorPage() {
             {/* Sağ - Aksiyonlar */}
             <div className="flex items-center gap-2">
               <button
+                onClick={handleSaveToServer}
+                disabled={isSavingToServer}
+                className="flex items-center gap-2 px-3 py-2 bg-cyan-600/80 border border-cyan-400/30 text-white hover:bg-cyan-500/80 rounded-lg transition-all text-sm font-medium shadow-lg shadow-cyan-500/10"
+              >
+                {isSavingToServer ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                )}
+                <span className="hidden md:inline">Sunucuya Kaydet</span>
+              </button>
+
+              <button
                 onClick={handleExportZip}
                 disabled={isExporting}
                 className="flex items-center gap-2 px-3 py-2 bg-editor-bg/50 border border-white/10 text-white/80 hover:text-white hover:border-primary/30 rounded-lg transition-all text-sm"
@@ -518,6 +716,14 @@ export default function EditorPage() {
         {/* Live Simulation Modal */}
         {showSimulation && (
           <ViewerPreviewModal onClose={() => setShowSimulation(false)} />
+        )}
+
+        {/* Server Auth Modal */}
+        {showAuthModal && (
+          <ServerAuthModal
+            onSuccess={handleAuthSuccess}
+            onCancel={() => { setShowAuthModal(false); setPendingSave(false) }}
+          />
         )}
       </div>
     </div>

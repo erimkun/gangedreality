@@ -59,6 +59,38 @@
       ],
       "defaultOptionIndex": null,
       "selectedOptionIndex": null
+    },
+    {
+      "id": "group_aibLwp8o9e",
+      "displayName": "2 Mesh Grubu",
+      "icon": null,
+      "targetMeshNames": [
+        "Mesh002",
+        "Mesh003"
+      ],
+      "options": [
+        {
+          "name": "ssss",
+          "type": "color",
+          "value": "#654343"
+        },
+        {
+          "name": "ssss",
+          "type": "color",
+          "value": "#b11010"
+        },
+        {
+          "name": "89 Norwegian Style Stone Tiles Pbr Texture Seamless",
+          "type": "texture",
+          "textureUrl": "/pre-assets/textures/89_Norwegian style stone tiles pbr texture-seamless.jpg",
+          "tiling": [
+            1,
+            1
+          ]
+        }
+      ],
+      "defaultOptionIndex": null,
+      "selectedOptionIndex": null
     }
   ]
 }

@@ -1,9 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
+import { fetchProjects, type ProjectListItem } from '@/services/api'
 
 // Fallback proje listesi — projects.json yüklenemezse kullanılır
-const FALLBACK_PROJECTS = ['1108-1', 'demo']
+const FALLBACK_PROJECTS: ProjectListItem[] = [
+  { projectId: '1108-1', projectName: '1108-1', status: 'published', thumbnail: null },
+  { projectId: 'demo', projectName: 'demo', status: 'published', thumbnail: null }
+]
+const FALLBACK_GRADIENTS = [
+  'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+  'linear-gradient(135deg, #2d1b69 0%, #11998e 100%)',
+  'linear-gradient(135deg, #3d1c02 0%, #8b5e3c 100%)',
+  'linear-gradient(135deg, #1b2838 0%, #2a5298 100%)',
+  'linear-gradient(135deg, #1a0c2e 0%, #3a1c71 50%, #6b3fa0 100%)',
+  'linear-gradient(135deg, #134e5e 0%, #71b280 100%)',
+  'linear-gradient(135deg, #2c1810 0%, #c4956a 100%)',
+  'linear-gradient(135deg, #0d1b2a 0%, #1b3a4b 50%, #3a7ca5 100%)',
+]
 
 // WebGL Arka Plan Bileşeni
 function WebGLBackground() {
@@ -206,29 +220,103 @@ function FeatureCard({ icon, title, description, footer }: FeatureCardProps) {
   )
 }
 
+interface ProjectCardProps {
+  project: ProjectListItem
+  thumbnailSrc: string | null
+  fallbackGradient: string
+  onClick: () => void
+  onImageError: (projectId: string) => void
+}
+
+function ProjectCard({ project, thumbnailSrc, fallbackGradient, onClick, onImageError }: ProjectCardProps) {
+  return (
+    <article
+      onClick={onClick}
+      className="cursor-pointer overflow-hidden rounded-2xl border border-[#3d3428] bg-[#1d1a15]/75 backdrop-blur-xl transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] active:scale-[0.98]"
+    >
+      <div className="relative h-44 overflow-hidden" style={{ background: fallbackGradient }}>
+        {thumbnailSrc && (
+          <img
+            src={thumbnailSrc}
+            alt={project.projectName}
+            onError={() => onImageError(project.projectId)}
+            className="h-full w-full object-cover"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <h3 className="text-base font-semibold text-white truncate">{project.projectName}</h3>
+          <p className="text-[11px] text-white/50 mt-0.5">{project.projectId}</p>
+        </div>
+      </div>
+    </article>
+  )
+}
+
 export default function HomePage() {
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [showResults, setShowResults] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
-  const [newProjectId, setNewProjectId] = useState('')
-  const [availableProjects, setAvailableProjects] = useState<string[]>(FALLBACK_PROJECTS)
+  const [availableProjects, setAvailableProjects] = useState<ProjectListItem[]>(FALLBACK_PROJECTS)
+  const [brokenThumbnails, setBrokenThumbnails] = useState<Record<string, boolean>>({})
   const searchRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Proje listesini dinamik yükle
   useEffect(() => {
-    fetch('/data/projects.json')
-      .then(r => r.ok ? r.json() : FALLBACK_PROJECTS)
-      .then((list: string[]) => setAvailableProjects(list))
-      .catch(() => setAvailableProjects(FALLBACK_PROJECTS))
+    let cancelled = false
+
+    const loadProjects = async () => {
+      try {
+        const projects = await fetchProjects()
+        if (!cancelled && projects.length > 0) {
+          setAvailableProjects(projects)
+          return
+        }
+      } catch {
+        // Fall through to static manifest.
+      }
+
+      try {
+        const response = await fetch('/data/projects.json')
+        const list = response.ok ? await response.json() : []
+        if (!cancelled) {
+          const normalized = Array.isArray(list)
+            ? list.map((projectId: string) => ({
+                projectId,
+                projectName: projectId,
+                status: 'published' as const,
+                thumbnail: null
+              }))
+            : FALLBACK_PROJECTS
+          setAvailableProjects(normalized.length > 0 ? normalized : FALLBACK_PROJECTS)
+        }
+      } catch {
+        if (!cancelled) {
+          setAvailableProjects(FALLBACK_PROJECTS)
+        }
+      }
+    }
+
+    loadProjects()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Arama sonuçlarını filtrele
   const filteredProjects = availableProjects.filter(project =>
-    project.toLowerCase().includes(searchQuery.toLowerCase())
+    `${project.projectName} ${project.projectId}`.toLowerCase().includes(searchQuery.toLowerCase())
   )
+  const allVisibleProjects = searchQuery ? filteredProjects : availableProjects
+
+  const resolveThumbnail = useCallback((project: ProjectListItem): string | null => {
+    if (brokenThumbnails[project.projectId]) return null
+    if (!project.thumbnail) return null
+    if (project.thumbnail.startsWith('/')) return project.thumbnail
+    return `/data/${project.projectId}/${project.thumbnail}`
+  }, [brokenThumbnails])
 
   // Dışarı tıklayınca dropdown'ı kapat
   useEffect(() => {
@@ -260,36 +348,40 @@ export default function HomePage() {
     setIsSearchOpen(false)
   }, [navigate])
 
-  // Yeni proje oluştur (editor)
-  const createNewProject = useCallback(() => {
-    if (newProjectId.trim()) {
-      navigate(`/${newProjectId.trim()}/editor`)
-      setShowNewProjectModal(false)
-      setNewProjectId('')
+  // Override the global overflow:hidden on html/body/#root so this page scrolls
+  useEffect(() => {
+    const root = document.getElementById('root')
+    document.documentElement.style.overflow = 'auto'
+    document.body.style.overflow = 'auto'
+    if (root) root.style.overflow = 'auto'
+    return () => {
+      document.documentElement.style.overflow = ''
+      document.body.style.overflow = ''
+      if (root) root.style.overflow = ''
     }
-  }, [newProjectId, navigate])
+  }, [])
 
   return (
-    <div className="min-h-screen bg-editor-bg relative overflow-x-hidden">
+    <div className="min-h-screen bg-editor-bg relative overflow-x-hidden overflow-y-auto">
       {/* WebGL Arka Plan */}
       <WebGLBackground />
 
       {/* Ana İçerik */}
-      <main className="relative z-10 min-h-screen flex items-center justify-center p-4 md:p-8">
-        <div className="max-w-4xl w-full">
+      <main className="relative z-10 p-4 md:p-8 pt-12 md:pt-16">
+        <div className="max-w-4xl w-full mx-auto">
           
           {/* Header */}
-          <div className="mb-10 text-center">
+          <div className="mb-6 text-center">
             <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-white mb-4">
-              Ganged Reality
+              Sanal Tur Deneyimi
             </h1>
             <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Web tabanlı 3D içerik yönetim ve görselleştirme platformu
             </p>
           </div>
 
-          {/* Arama ve Yeni Proje */}
-          <div className="flex items-center justify-center gap-3 mb-12">
+          {/* Arama */}
+          <div className="flex items-center justify-center gap-3 mb-8">
             {/* Arama Alanı - Animasyonlu */}
             <div ref={searchRef} className="relative">
               <div 
@@ -343,14 +435,17 @@ export default function HomePage() {
                   {filteredProjects.length > 0 ? (
                     filteredProjects.map((project) => (
                       <button
-                        key={project}
-                        onClick={() => goToProject(project)}
+                        key={project.projectId}
+                        onClick={() => goToProject(project.projectId)}
                         className="w-full px-4 py-3 text-left text-white hover:bg-primary/10 transition-colors flex items-center gap-3"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                         </svg>
-                        <span>{project}</span>
+                        <div>
+                          <div>{project.projectName}</div>
+                          <div className="text-[11px] text-gray-500">{project.projectId}</div>
+                        </div>
                       </button>
                     ))
                   ) : (
@@ -361,18 +456,43 @@ export default function HomePage() {
                 </div>
               )}
             </div>
-
-            {/* Yeni Proje Butonu */}
-            <button
-              onClick={() => setShowNewProjectModal(true)}
-              className="bg-primary hover:bg-primary/80 text-editor-bg p-3 rounded-xl transition-all hover:shadow-lg hover:shadow-primary/20"
-              title="Yeni Proje"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
           </div>
+
+          <section className="mb-12">
+            <style>{`
+              .projects-scroll::-webkit-scrollbar { width: 6px; }
+              .projects-scroll::-webkit-scrollbar-track { background: transparent; }
+              .projects-scroll::-webkit-scrollbar-thumb { background: #3d3428; border-radius: 3px; }
+              .projects-scroll::-webkit-scrollbar-thumb:hover { background: #D0BB95; }
+              .projects-scroll { scrollbar-color: #3d3428 transparent; scrollbar-width: thin; }
+            `}</style>
+            <h2 className="text-lg font-semibold text-white mb-3">Projeler</h2>
+            <div className="projects-scroll max-h-[210px] overflow-y-auto snap-y snap-mandatory scroll-smooth rounded-xl pr-1">
+              {allVisibleProjects.length > 0 ? (
+                Array.from({ length: Math.ceil(allVisibleProjects.length / 3) }, (_, rowIdx) => {
+                  const row = allVisibleProjects.slice(rowIdx * 3, rowIdx * 3 + 3)
+                  return (
+                    <div key={rowIdx} className={`grid grid-cols-3 gap-4 snap-start ${rowIdx > 0 ? 'mt-4' : ''}`}>
+                      {row.map((project, colIdx) => (
+                        <ProjectCard
+                          key={project.projectId}
+                          project={project}
+                          thumbnailSrc={resolveThumbnail(project)}
+                          fallbackGradient={FALLBACK_GRADIENTS[(rowIdx * 3 + colIdx) % FALLBACK_GRADIENTS.length]}
+                          onClick={() => goToProject(project.projectId)}
+                          onImageError={(pid) => setBrokenThumbnails(prev => ({ ...prev, [pid]: true }))}
+                        />
+                      ))}
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[#3d3428] bg-[#1d1a15]/55 px-6 py-10 text-center text-gray-400">
+                  Görüntülenecek proje bulunamadı.
+                </div>
+              )}
+            </div>
+          </section>
 
           {/* Özellikler Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -475,47 +595,6 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Yeni Proje Modal */}
-      {showNewProjectModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-[#1d1a15] border border-[#3d3428] rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl"
-            style={{ boxShadow: 'rgba(208, 187, 149, 0.1) 0px 0px 50px' }}>
-            <h2 className="text-xl font-semibold text-white mb-2">
-              Yeni Proje Oluştur
-            </h2>
-            <p className="text-gray-500 text-sm mb-6">
-              Proje URL'sini girin. Mevcut değilse yeni bir editör açılacak.
-            </p>
-            <input
-              type="text"
-              placeholder="Proje ID (örn: 1234)"
-              value={newProjectId}
-              onChange={(e) => setNewProjectId(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && createNewProject()}
-              autoFocus
-              className="w-full bg-[#152228] border border-[#3d3428] rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary transition-colors mb-6"
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowNewProjectModal(false)
-                  setNewProjectId('')
-                }}
-                className="flex-1 bg-[#152228] hover:bg-[#1e2e36] text-white py-3 rounded-xl transition-colors"
-              >
-                İptal
-              </button>
-              <button
-                onClick={createNewProject}
-                disabled={!newProjectId.trim()}
-                className="flex-1 bg-primary hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed text-editor-bg py-3 rounded-xl transition-colors font-medium"
-              >
-                Oluştur
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

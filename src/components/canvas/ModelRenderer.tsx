@@ -221,9 +221,6 @@ function LoadedModel({
       }
 
       if (child instanceof THREE.Mesh) {
-        // Skip if deleted
-        if (isDeleted) return
-
         child.castShadow = true
         child.receiveShadow = true
         meshCount++
@@ -244,17 +241,13 @@ function LoadedModel({
             id: meshId,
             name: meshName,
             object: child,
-            visible: true,
+            visible: !isDeleted,
             type: 'mesh',
             parentId: config.id // Associate with model ID
           })
           registeredIds.push(meshId)
         }
       } else if (child instanceof THREE.Group && child !== scene) {
-        // Skip if deleted
-        const isDeleted = deletedMeshIds?.includes(child.uuid) || (child.name && deletedMeshIds?.includes(child.name))
-        if (isDeleted) return
-
         groupCount++
         
         // Optionally register groups too
@@ -264,7 +257,7 @@ function LoadedModel({
             id: child.uuid,
             name: child.name,
             object: child,
-            visible: true,
+            visible: !isDeleted,
             type: 'group',
             parentId: config.id
           })
@@ -474,6 +467,89 @@ function LoadedModel({
       variantMaterialCache.clear()
     }
   }, [configurableGroups, scene, isEditor])
+
+  useEffect(() => {
+    const overrides = config.meshMaterialOverrides
+    if (!overrides || Object.keys(overrides).length === 0) return
+
+    const textureLoader = new THREE.TextureLoader()
+    const loadedTextures: THREE.Texture[] = []
+    const overriddenMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>()
+
+    const applyTextureSettings = (texture: THREE.Texture, isSRGB: boolean) => {
+      texture.wrapS = THREE.RepeatWrapping
+      texture.wrapT = THREE.RepeatWrapping
+      texture.repeat.set(1, 1)
+      texture.generateMipmaps = true
+      texture.minFilter = THREE.LinearMipmapLinearFilter
+      texture.magFilter = THREE.LinearFilter
+      if (isSRGB) {
+        try { texture.colorSpace = THREE.SRGBColorSpace } catch { }
+      } else {
+        try { texture.colorSpace = THREE.NoColorSpace } catch { }
+      }
+      loadedTextures.push(texture)
+    }
+
+    scene.traverse((child) => {
+      if (!(child instanceof THREE.Mesh) || Array.isArray(child.material)) return
+      const override = overrides[child.name]
+      if (!override || !(child.material instanceof THREE.MeshStandardMaterial)) return
+
+      overriddenMaterials.set(child, child.material)
+      const nextMaterial = child.material.clone()
+
+      if (override.color) nextMaterial.color.set(override.color)
+      if (override.metalness !== undefined) nextMaterial.metalness = override.metalness
+      if (override.roughness !== undefined) nextMaterial.roughness = override.roughness
+
+      if (override.textureUrl !== undefined) {
+        nextMaterial.map = null
+        if (override.textureUrl) {
+          textureLoader.load(override.textureUrl, (texture) => {
+            applyTextureSettings(texture, true)
+            nextMaterial.map = texture
+            nextMaterial.needsUpdate = true
+          })
+        }
+      }
+
+      if (override.normalMapUrl !== undefined) {
+        nextMaterial.normalMap = null
+        if (override.normalMapUrl) {
+          textureLoader.load(override.normalMapUrl, (texture) => {
+            applyTextureSettings(texture, false)
+            nextMaterial.normalMap = texture
+            nextMaterial.needsUpdate = true
+          })
+        }
+      }
+
+      if (override.roughnessMapUrl !== undefined) {
+        nextMaterial.roughnessMap = null
+        if (override.roughnessMapUrl) {
+          textureLoader.load(override.roughnessMapUrl, (texture) => {
+            applyTextureSettings(texture, false)
+            nextMaterial.roughnessMap = texture
+            nextMaterial.needsUpdate = true
+          })
+        }
+      }
+
+      nextMaterial.needsUpdate = true
+      child.material = nextMaterial
+    })
+
+    return () => {
+      overriddenMaterials.forEach((material, mesh) => {
+        if (mesh.material instanceof THREE.Material && mesh.material !== material) {
+          mesh.material.dispose()
+        }
+        mesh.material = material
+      })
+      loadedTextures.forEach(texture => texture.dispose())
+    }
+  }, [config.meshMaterialOverrides, configurableGroups, scene])
 
   // Apply mesh transforms from config (for both Editor and Viewer)
   useEffect(() => {

@@ -69,6 +69,7 @@ interface EditorState {
   
   // Object Management
   deleteObject: (id: string) => void
+  restoreDeletedObject: (id: string) => void
 
   // Focus
   focusOnSelection: () => void
@@ -303,44 +304,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     
     if (meshInfo && meshInfo.object) {
       log('deleteObject', { id, name: meshInfo.name })
+      const objectRef = meshInfo.object
+      const objectName = meshInfo.name || id
+      const deletedKey = objectName || id
+      const wasVisible = objectRef.visible
+      const wasHidden = state.hiddenMeshIds.has(id)
+      const deletedAlready = (useSceneStore.getState().deletedMeshIds || []).includes(deletedKey)
+      if (deletedAlready) return
       
-      // Remove from parent
-      if (meshInfo.object.parent) {
-        meshInfo.object.parent.remove(meshInfo.object)
-      }
-      
-      // Dispose resources
-      if (meshInfo.object instanceof THREE.Mesh) {
-        if (meshInfo.object.geometry) {
-          meshInfo.object.geometry.dispose()
-        }
-        if (meshInfo.object.material) {
-          const disposeMaterial = (mat: THREE.Material) => {
-            // Dispose all textures attached to the material
-            const stdMat = mat as any
-            const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'displacementMap', 'alphaMap', 'bumpMap', 'envMap', 'lightMap']
-            for (const prop of textureProps) {
-              if (stdMat[prop] && stdMat[prop] instanceof THREE.Texture) {
-                stdMat[prop].dispose()
-              }
-            }
-            mat.dispose()
-          }
-          if (Array.isArray(meshInfo.object.material)) {
-            meshInfo.object.material.forEach(disposeMaterial)
-          } else {
-            disposeMaterial(meshInfo.object.material)
-          }
-        }
-      }
+      objectRef.visible = false
+      useSceneStore.getState().addDeletedMesh(deletedKey)
+      const nextHiddenIds = new Set(state.hiddenMeshIds)
+      nextHiddenIds.add(id)
       
       // Update selection if needed
       if (state.selectedObjectIds.includes(id)) {
         const newSelectedIds = state.selectedObjectIds.filter(sid => sid !== id)
-        const newSelectedObjects = state.selectedObjects.filter(obj => obj.uuid !== id)
+        const newSelectedObjects = state.selectedObjects.filter((_, idx) => state.selectedObjectIds[idx] !== id)
         const newSelectedNames = state.selectedMeshNames.filter((_, idx) => state.selectedObjectIds[idx] !== id)
         
         set({
+          hiddenMeshIds: nextHiddenIds,
           selectedObjectIds: newSelectedIds,
           selectedObjects: newSelectedObjects,
           selectedMeshNames: newSelectedNames,
@@ -349,15 +333,46 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedObjectId: newSelectedIds.length > 0 ? newSelectedIds[newSelectedIds.length - 1] : null,
           selectedMeshName: newSelectedNames.length > 0 ? newSelectedNames[newSelectedNames.length - 1] : null
         })
+      } else {
+        set({ hiddenMeshIds: nextHiddenIds })
       }
-      
-      // Remove from registry
-      get().unregisterMesh(id)
 
-      // Add to deleted meshes in SceneStore (for persistence)
-      // Use name if available for persistence across reloads, fall back to ID
-      useSceneStore.getState().addDeletedMesh(meshInfo.name || id)
+      useHistoryStore.getState().pushAction({
+        description: `Delete ${objectName}`,
+        undo: () => {
+          const latestState = get()
+          objectRef.visible = wasVisible
+          useSceneStore.getState().removeDeletedMesh(deletedKey)
+          const restoredHiddenIds = new Set(latestState.hiddenMeshIds)
+          if (!wasHidden) {
+            restoredHiddenIds.delete(id)
+          }
+          set({ hiddenMeshIds: restoredHiddenIds })
+        },
+        redo: () => {
+          const latestState = get()
+          objectRef.visible = false
+          useSceneStore.getState().addDeletedMesh(deletedKey)
+          const restoredHiddenIds = new Set(latestState.hiddenMeshIds)
+          restoredHiddenIds.add(id)
+          set({ hiddenMeshIds: restoredHiddenIds })
+        }
+      })
     }
+  },
+
+  restoreDeletedObject: (id) => {
+    const state = get()
+    const meshInfo = state.sceneMeshes.find(m => m.id === id)
+    if (!meshInfo) return
+
+    const deletedKey = meshInfo.name || id
+    meshInfo.object.visible = true
+    useSceneStore.getState().removeDeletedMesh(deletedKey)
+
+    const nextHiddenIds = new Set(state.hiddenMeshIds)
+    nextHiddenIds.delete(id)
+    set({ hiddenMeshIds: nextHiddenIds })
   },
 
   // Focus

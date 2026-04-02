@@ -144,10 +144,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // Resolve relative paths for all models in the models array
       if (assets.models && assets.models.length > 0) {
         assets.models.forEach(model => {
+          const resolveProjectAssetUrl = (url?: string | null) => {
+            if (url && !url.startsWith('/') && !url.startsWith('blob:') && !url.startsWith('http')) {
+              return `/data/${projectId}/${url}`
+            }
+            return url
+          }
+
           if (model.url && !model.url.startsWith('/') && !model.url.startsWith('blob:') && !model.url.startsWith('http')) {
             const originalUrl = model.url
             model.url = `/data/${projectId}/${model.url}`
             log('Converted sub-model path', { original: originalUrl, resolved: model.url })
+          }
+
+          if (model.meshMaterialOverrides) {
+            Object.values(model.meshMaterialOverrides).forEach((override) => {
+              override.textureUrl = resolveProjectAssetUrl(override.textureUrl)
+              override.normalMapUrl = resolveProjectAssetUrl(override.normalMapUrl)
+              override.roughnessMapUrl = resolveProjectAssetUrl(override.roughnessMapUrl)
+            })
           }
         })
       }

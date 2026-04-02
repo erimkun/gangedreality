@@ -33,12 +33,29 @@ export default function EditorControls() {
   const { gl, scene, controls } = useThree()
   
   // Store transform state before drag for undo
-  const preDragStateRef = useRef<{
-    position: THREE.Vector3
-    rotation: THREE.Euler
-    scale: THREE.Vector3
-    objectId: string | null
-  } | null>(null)
+  const preDragStateRef = useRef<
+    | {
+        type: 'single'
+        item: {
+          position: THREE.Vector3
+          rotation: THREE.Euler
+          scale: THREE.Vector3
+          objectId: string
+          objectRef: THREE.Object3D
+        }
+      }
+    | {
+        type: 'multi'
+        items: Array<{
+          position: THREE.Vector3
+          rotation: THREE.Euler
+          scale: THREE.Vector3
+          objectId: string
+          objectRef: THREE.Object3D
+        }>
+      }
+    | null
+  >(null)
   
   // Track if we're in multi-select mode
   const isMultiSelect = selectedObjects.length > 1
@@ -114,6 +131,49 @@ export default function EditorControls() {
     return 'mesh'
   }, [])
 
+  const syncObjectStateToStore = useCallback((objectId: string, objectRef: THREE.Object3D) => {
+    const objectType = getObjectType(objectId)
+    const position = objectRef.position.toArray() as [number, number, number]
+
+    if (objectType === 'light') {
+      updateLight(objectId, { position })
+      return
+    }
+
+    if (objectType === 'zone') {
+      updateZone(objectId, { position, radius: objectRef.scale.x })
+      return
+    }
+
+    if (objectType === 'model') {
+      useProjectStore.getState().updateModel(objectId, {
+        position,
+        rotation: objectRef.rotation.toArray().slice(0, 3) as [number, number, number],
+        scale: objectRef.scale.toArray() as [number, number, number]
+      })
+      return
+    }
+
+    if (objectType === 'mesh') {
+      const meshInfo = useEditorStore.getState().sceneMeshes.find(m => m.id === objectId)
+      if (meshInfo && meshInfo.parentId) {
+        const modelId = meshInfo.parentId
+        const targetModel = useProjectStore.getState().assets.models.find(m => m.id === modelId)
+        if (targetModel) {
+          const newTransforms = {
+            ...(targetModel.meshTransforms || {}),
+            [meshInfo.name]: {
+              position,
+              rotation: objectRef.rotation.toArray().slice(0, 3) as [number, number, number],
+              scale: objectRef.scale.toArray() as [number, number, number]
+            }
+          }
+          useProjectStore.getState().updateModel(modelId, { meshTransforms: newTransforms })
+        }
+      }
+    }
+  }, [getObjectType, updateLight, updateZone])
+
   // Apply group transform to all selected objects
   const syncGroupToObjects = useCallback(() => {
     if (!multiSelectGroupRef.current || !isMultiSelect) return
@@ -148,23 +208,13 @@ export default function EditorControls() {
         // This is optional - comment out if you only want position change
       }
       
-      // Update stores
-      const objectType = getObjectType(id)
-      const position = obj.position.toArray() as [number, number, number]
-      
-      if (objectType === 'light') {
-        updateLight(id, { position })
-      } else if (objectType === 'zone') {
-        updateZone(id, { position })
-      } else if (objectType === 'model') {
-        useProjectStore.getState().updateModel(id, {
-          position,
-          rotation: obj.rotation.toArray().slice(0, 3) as [number, number, number],
-          scale: obj.scale.toArray() as [number, number, number]
-        })
+      if (getObjectType(id) === 'zone') {
+        updateZone(id, { position: obj.position.toArray() as [number, number, number] })
+      } else {
+        syncObjectStateToStore(id, obj)
       }
     })
-  }, [isMultiSelect, selectedObjects, selectedObjectIds, activeTool, getObjectType, updateLight, updateZone])
+  }, [isMultiSelect, selectedObjects, selectedObjectIds, activeTool, getObjectType, updateZone, syncObjectStateToStore])
 
   // Handle transform changes for multi-select
   const handleMultiTransformChange = useCallback(() => {
@@ -187,63 +237,8 @@ export default function EditorControls() {
   // Handle transform changes - sync with stores (single object)
   const handleTransformChange = useCallback(() => {
     if (!selectedObject || !selectedObjectId) return
-    
-    const position = selectedObject.position.toArray() as [number, number, number]
-    const objectType = getObjectType(selectedObjectId)
-    
-    switch (objectType) {
-      case 'light':
-        updateLight(selectedObjectId, { position })
-        break
-      case 'zone':
-        const scale = selectedObject.scale.x // Uniform scale = radius
-        updateZone(selectedObjectId, { position, radius: scale })
-        break
-      case 'model':
-        useProjectStore.getState().updateModel(selectedObjectId, {
-          position,
-          rotation: selectedObject.rotation.toArray().slice(0, 3) as [number, number, number],
-          scale: selectedObject.scale.toArray() as [number, number, number]
-        })
-        break
-      case 'mesh':
-        // Find which model this mesh belongs to
-        const meshInfo = useEditorStore.getState().sceneMeshes.find(m => m.id === selectedObjectId)
-        if (meshInfo && meshInfo.parentId) {
-          const modelId = meshInfo.parentId
-          
-          // If it's the main model (legacy), we might need to find it in the models array if it was migrated, 
-          // or we might need to handle it specially if it's just a URL string.
-          // For now, let's assume all models are in the models array or we can update the main model config if it exists there.
-          
-          // Actually, updateModel works on ID. If ID is 'main-model', it should work if it's in the array.
-          // If it's NOT in the array (legacy mainModel string only), we can't easily store mesh transforms 
-          // unless we migrate it to the array.
-          // But ModelRenderer creates a fake model object for mainModel if the array is empty.
-          // So we should probably ensure mainModel is in the array if we want to support this.
-          // However, let's try to update it if found.
-          
-          const targetModel = useProjectStore.getState().assets.models.find(m => m.id === modelId)
-          
-          if (targetModel) {
-            const newTransforms = {
-              ...(targetModel.meshTransforms || {}),
-              [meshInfo.name]: {
-                position: selectedObject.position.toArray() as [number, number, number],
-                rotation: selectedObject.rotation.toArray().slice(0, 3) as [number, number, number],
-                scale: selectedObject.scale.toArray() as [number, number, number]
-              }
-            }
-            
-            useProjectStore.getState().updateModel(modelId, {
-              meshTransforms: newTransforms
-            })
-            log('Mesh transform saved to store:', { mesh: meshInfo.name, modelId })
-          }
-        }
-        break
-    }
-  }, [selectedObject, selectedObjectId, getObjectType, updateLight, updateZone])
+    syncObjectStateToStore(selectedObjectId, selectedObject)
+  }, [selectedObject, selectedObjectId, syncObjectStateToStore])
   
   // Keyboard shortcuts for tool switching
   useEffect(() => {
@@ -402,129 +397,114 @@ export default function EditorControls() {
       setGizmoActive(isDragStart)
       
       // Store state at drag start for undo
-      if (isDragStart && selectedObject && selectedObjectId) {
-        preDragStateRef.current = {
-          position: selectedObject.position.clone(),
-          rotation: selectedObject.rotation.clone(),
-          scale: selectedObject.scale.clone(),
-          objectId: selectedObjectId
+      if (isDragStart) {
+        if (isMultiSelect && selectedObjects.length > 1) {
+          preDragStateRef.current = {
+            type: 'multi',
+            items: selectedObjects.map((objectRef, index) => ({
+              objectId: selectedObjectIds[index],
+              objectRef,
+              position: objectRef.position.clone(),
+              rotation: objectRef.rotation.clone(),
+              scale: objectRef.scale.clone()
+            }))
+          }
+        } else if (selectedObject && selectedObjectId) {
+          preDragStateRef.current = {
+            type: 'single',
+            item: {
+              position: selectedObject.position.clone(),
+              rotation: selectedObject.rotation.clone(),
+              scale: selectedObject.scale.clone(),
+              objectId: selectedObjectId,
+              objectRef: selectedObject
+            }
+          }
         }
         log('Drag started, saved state for undo')
       }
       
       // On drag end, push action to history
-      if (isDragEnd && preDragStateRef.current && selectedObject && selectedObjectId) {
-        const preState = preDragStateRef.current
-        const postPosition = selectedObject.position.clone()
-        const postRotation = selectedObject.rotation.clone()
-        const postScale = selectedObject.scale.clone()
-        const objectId = selectedObjectId
-        const objectRef = selectedObject
-        
-        // Only push to history if something actually changed
-        const posChanged = !preState.position.equals(postPosition)
-        const rotChanged = preState.rotation.x !== postRotation.x || 
-                          preState.rotation.y !== postRotation.y || 
-                          preState.rotation.z !== postRotation.z
-        const scaleChanged = !preState.scale.equals(postScale)
-        
-        if (posChanged || rotChanged || scaleChanged) {
-          pushAction({
-            description: `Transform ${objectId}`,
-            undo: () => {
-              // Guard: check if the object is still in the scene
-              if (!objectRef.parent) {
-                console.warn(`[EditorControls] Undo skipped: object ${objectId} no longer in scene`)
-                return
-              }
-              objectRef.position.copy(preState.position)
-              objectRef.rotation.copy(preState.rotation)
-              objectRef.scale.copy(preState.scale)
-              // Update stores
-              const objectType = getObjectType(objectId)
-              const pos = preState.position.toArray() as [number, number, number]
-              if (objectType === 'light') {
-                updateLight(objectId, { position: pos })
-              } else if (objectType === 'zone') {
-                updateZone(objectId, { position: pos, radius: preState.scale.x })
-              } else if (objectType === 'model') {
-                useProjectStore.getState().updateModel(objectId, {
-                  position: pos,
-                  rotation: preState.rotation.toArray().slice(0, 3) as [number, number, number],
-                  scale: preState.scale.toArray() as [number, number, number]
-                })
-              } else if (objectType === 'mesh') {
-                const meshInfo = useEditorStore.getState().sceneMeshes.find(m => m.id === objectId)
-                if (meshInfo && meshInfo.parentId) {
-                  const modelId = meshInfo.parentId
-                  const targetModel = useProjectStore.getState().assets.models.find(m => m.id === modelId)
-                  if (targetModel) {
-                    const newTransforms = {
-                      ...(targetModel.meshTransforms || {}),
-                      [meshInfo.name]: {
-                        position: pos,
-                        rotation: preState.rotation.toArray().slice(0, 3) as [number, number, number],
-                        scale: preState.scale.toArray() as [number, number, number]
-                      }
-                    }
-                    useProjectStore.getState().updateModel(modelId, { meshTransforms: newTransforms })
-                  }
-                }
-              }
-              log('Undo transform')
-            },
-            redo: () => {
-              // Guard: check if the object is still in the scene
-              if (!objectRef.parent) {
-                console.warn(`[EditorControls] Redo skipped: object ${objectId} no longer in scene`)
-                return
-              }
-              objectRef.position.copy(postPosition)
-              objectRef.rotation.copy(postRotation)
-              objectRef.scale.copy(postScale)
-              // Update stores
-              const objectType = getObjectType(objectId)
-              const pos = postPosition.toArray() as [number, number, number]
-              if (objectType === 'light') {
-                updateLight(objectId, { position: pos })
-              } else if (objectType === 'zone') {
-                updateZone(objectId, { position: pos, radius: postScale.x })
-              } else if (objectType === 'model') {
-                useProjectStore.getState().updateModel(objectId, {
-                  position: pos,
-                  rotation: postRotation.toArray().slice(0, 3) as [number, number, number],
-                  scale: postScale.toArray() as [number, number, number]
-                })
-              } else if (objectType === 'mesh') {
-                const meshInfo = useEditorStore.getState().sceneMeshes.find(m => m.id === objectId)
-                if (meshInfo && meshInfo.parentId) {
-                  const modelId = meshInfo.parentId
-                  const targetModel = useProjectStore.getState().assets.models.find(m => m.id === modelId)
-                  if (targetModel) {
-                    const newTransforms = {
-                      ...(targetModel.meshTransforms || {}),
-                      [meshInfo.name]: {
-                        position: pos,
-                        rotation: postRotation.toArray().slice(0, 3) as [number, number, number],
-                        scale: postScale.toArray() as [number, number, number]
-                      }
-                    }
-                    useProjectStore.getState().updateModel(modelId, { meshTransforms: newTransforms })
-                  }
-                }
-              }
-              log('Redo transform')
-            }
+      if (isDragEnd && preDragStateRef.current) {
+        if (preDragStateRef.current.type === 'multi') {
+          handleMultiTransformChange()
+
+          const preItems = preDragStateRef.current.items
+          const postItems = preItems.map((item) => ({
+            ...item,
+            position: item.objectRef.position.clone(),
+            rotation: item.objectRef.rotation.clone(),
+            scale: item.objectRef.scale.clone()
+          }))
+
+          const didChange = preItems.some((item, index) => {
+            const postItem = postItems[index]
+            return !item.position.equals(postItem.position) ||
+              !item.scale.equals(postItem.scale) ||
+              item.rotation.x !== postItem.rotation.x ||
+              item.rotation.y !== postItem.rotation.y ||
+              item.rotation.z !== postItem.rotation.z
           })
-          log('Transform action pushed to history')
+
+          if (didChange) {
+            pushAction({
+              description: `Transform ${preItems.length} selected objects`,
+              undo: () => {
+                preItems.forEach((item) => {
+                  if (!item.objectRef.parent) return
+                  item.objectRef.position.copy(item.position)
+                  item.objectRef.rotation.copy(item.rotation)
+                  item.objectRef.scale.copy(item.scale)
+                  syncObjectStateToStore(item.objectId, item.objectRef)
+                })
+              },
+              redo: () => {
+                postItems.forEach((item) => {
+                  if (!item.objectRef.parent) return
+                  item.objectRef.position.copy(item.position)
+                  item.objectRef.rotation.copy(item.rotation)
+                  item.objectRef.scale.copy(item.scale)
+                  syncObjectStateToStore(item.objectId, item.objectRef)
+                })
+              }
+            })
+          }
+        } else if (selectedObject && selectedObjectId) {
+          const preState = preDragStateRef.current.item
+          const postPosition = selectedObject.position.clone()
+          const postRotation = selectedObject.rotation.clone()
+          const postScale = selectedObject.scale.clone()
+          const objectId = selectedObjectId
+          const objectRef = selectedObject
+
+          const posChanged = !preState.position.equals(postPosition)
+          const rotChanged = preState.rotation.x !== postRotation.x ||
+            preState.rotation.y !== postRotation.y ||
+            preState.rotation.z !== postRotation.z
+          const scaleChanged = !preState.scale.equals(postScale)
+
+          if (posChanged || rotChanged || scaleChanged) {
+            pushAction({
+              description: `Transform ${objectId}`,
+              undo: () => {
+                if (!objectRef.parent) return
+                objectRef.position.copy(preState.position)
+                objectRef.rotation.copy(preState.rotation)
+                objectRef.scale.copy(preState.scale)
+                syncObjectStateToStore(objectId, objectRef)
+              },
+              redo: () => {
+                if (!objectRef.parent) return
+                objectRef.position.copy(postPosition)
+                objectRef.rotation.copy(postRotation)
+                objectRef.scale.copy(postScale)
+                syncObjectStateToStore(objectId, objectRef)
+              }
+            })
+          }
         }
-        
+
         preDragStateRef.current = null
-      }
-      
-      // When drag ends, update offsets for multi-select
-      if (isDragEnd && isMultiSelect) {
-        handleMultiTransformChange()
       }
     }
     
@@ -539,7 +519,7 @@ export default function EditorControls() {
         (controls as any).enabled = true
       }
     }
-  }, [gl, controls, isMultiSelect, handleMultiTransformChange, selectedObject, selectedObjectId, getObjectType, updateLight, updateZone, pushAction])
+  }, [gl, controls, isMultiSelect, handleMultiTransformChange, selectedObject, selectedObjectId, selectedObjects, selectedObjectIds, pushAction, setGizmoActive, syncObjectStateToStore])
   
   if (selectedObjects.length === 0) return null
 

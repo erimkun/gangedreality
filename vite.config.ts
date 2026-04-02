@@ -13,6 +13,14 @@ export default defineConfig({
   // Alt klasörden çalıştırma için base ayarı
   // Production'da dinamik olarak ayarlanabilir
   base: '/',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     chunkSizeWarningLimit: 1600,
     rollupOptions: {

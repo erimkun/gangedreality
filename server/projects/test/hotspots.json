@@ -1,0 +1,13 @@
+{
+  "nodes": [],
+  "settings": {
+    "cursorColor": "#ffffff",
+    "cursorSize": 0.4,
+    "cursorOpacity": 0.8,
+    "defaultShape": "circle",
+    "animationDuration": 0.3,
+    "nodeColor": "#00d4ff",
+    "nodeHoverColor": "#ffffff",
+    "walkableMeshIds": []
+  }
+}

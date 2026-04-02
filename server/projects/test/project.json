@@ -1,0 +1,35 @@
+{
+    "projectId":  "test",
+    "projectName":  "test",
+    "version":  "1.0",
+    "defaultMode":  "viewer",
+    "editorLock":  false,
+    "status":  "draft",
+    "assets":  {
+                   "envMap":  null,
+                   "models":  [
+                                  {
+                                      "id":  "main-model",
+                                      "name":  "Main Model",
+                                      "visible":  true,
+                                      "rotation":  [
+                                                       0,
+                                                       0,
+                                                       0
+                                                   ],
+                                      "scale":  [
+                                                    1,
+                                                    1,
+                                                    1
+                                                ],
+                                      "url":  "model/950_2-compressed.glb",
+                                      "position":  [
+                                                       0,
+                                                       0,
+                                                       0
+                                                   ]
+                                  }
+                              ],
+                   "mainModel":  "model/950_2-compressed.glb"
+               }
+}

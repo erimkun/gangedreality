@@ -42,6 +42,16 @@ export interface ModelConfig {
     rotation?: [number, number, number]
     scale?: [number, number, number]
   }>
+  meshMaterialOverrides?: Record<string, MeshMaterialOverride>
+}
+
+export interface MeshMaterialOverride {
+  color?: string
+  textureUrl?: string | null
+  normalMapUrl?: string | null
+  roughnessMapUrl?: string | null
+  metalness?: number
+  roughness?: number
 }
 
 // ============ PROJECT.JSON ============
@@ -51,6 +61,8 @@ export interface ProjectConfig {
   version: string
   defaultMode: 'viewer' | 'editor' | 'player'
   editorLock: boolean
+  status?: 'draft' | 'published'
+  thumbnail?: string
   assets: {
     mainModel: string | null
     envMap: string | null

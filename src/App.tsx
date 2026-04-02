@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import HomePage from './pages/HomePage'
 import ViewerPage from './pages/ViewerPage'
 import EditorPage from './pages/EditorPage'
+import AdminPage from './pages/AdminPage'
 import ToastContainer from './components/ui/ToastContainer'
 
 const EDITOR_AUTH_STORAGE_KEY = 'gr-editor-auth'
@@ -88,6 +89,9 @@ function App() {
       <Routes>
         {/* Ana sayfa */}
         <Route path="/" element={<HomePage />} />
+        
+        {/* Admin Panel */}
+        <Route path="/admin" element={<AdminPage />} />
         
         {/* Proje Viewer modu - /:projectId */}
         <Route path="/:projectId" element={<ViewerPage />} />

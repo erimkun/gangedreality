@@ -35,6 +35,7 @@ interface SceneStore extends SceneConfig {
 
   // Mesh Actions
   addDeletedMesh: (id: string) => void
+  removeDeletedMesh: (id: string) => void
 
   // General Actions
   loadFromConfig: (config: SceneConfig) => void
@@ -159,6 +160,10 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     if (existing.includes(id)) return {}
     return { deletedMeshIds: [...existing, id] }
   }),
+
+  removeDeletedMesh: (id) => set((state) => ({
+    deletedMeshIds: (state.deletedMeshIds || []).filter(existingId => existingId !== id)
+  })),
 
   loadFromConfig: (config) => set(() => ({
     ...config,

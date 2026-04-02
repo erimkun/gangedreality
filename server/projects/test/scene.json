@@ -1,0 +1,27 @@
+{
+  "environment": {
+    "hdri": null,
+    "hdriPreset": "apartment",
+    "customHdriUrl": null,
+    "intensity": 0.7,
+    "rotation": 0,
+    "backgroundBlurriness": 0,
+    "showBackground": true
+  },
+  "lights": [],
+  "player": {
+    "startPosition": [
+      0,
+      1.7,
+      5
+    ],
+    "startRotation": [
+      0,
+      0,
+      0
+    ],
+    "moveSpeed": 2,
+    "eyeHeight": 1.7
+  },
+  "effects": {}
+}
